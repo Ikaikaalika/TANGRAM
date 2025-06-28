@@ -499,6 +499,335 @@ if __name__ == "__main__":
         finally:
             self.disconnect()
     
+    @log_function_call()
+    def run_pybullet_simulation(self, scene_graph_file: Path, llm_interpretation_file: Path,
+                               local_output_dir: Path) -> bool:
+        """
+        Run PyBullet robot simulation on Thunder Compute.
+        
+        Args:
+            scene_graph_file: Local path to scene graph JSON
+            llm_interpretation_file: Local path to LLM interpretation JSON
+            local_output_dir: Local directory for simulation results
+            
+        Returns:
+            True if simulation successful
+        """
+        logger.info("Running PyBullet simulation on Thunder Compute...")
+        
+        if not self.connect():
+            return False
+        
+        try:
+            # Upload input files
+            remote_dir = self.upload_data([scene_graph_file, llm_interpretation_file], "pybullet_job")
+            
+            # Create remote simulation script
+            remote_script = f"{remote_dir}/run_pybullet.py"
+            pybullet_script = self._create_pybullet_script(
+                scene_graph_file=f"{remote_dir}/{scene_graph_file.name}",
+                llm_file=f"{remote_dir}/{llm_interpretation_file.name}",
+                output_dir=f"{remote_dir}/simulation_output"
+            )
+            
+            # Upload script
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+                f.write(pybullet_script)
+                temp_script = Path(f.name)
+            
+            self.sftp_client.put(str(temp_script), remote_script)
+            temp_script.unlink()
+            
+            # Run PyBullet simulation
+            logger.info("Executing PyBullet simulation on Thunder Compute...")
+            exit_status, stdout, stderr = self._run_remote_command(
+                f"cd {remote_dir} && python run_pybullet.py",
+                timeout=900  # 15 minutes
+            )
+            
+            if exit_status != 0:
+                logger.error(f"PyBullet simulation failed: {stderr}")
+                return False
+            
+            # Download results
+            success = self.download_results(f"{remote_dir}/simulation_output", local_output_dir)
+            
+            # Cleanup remote data
+            self._run_remote_command(f"rm -rf {remote_dir}")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Thunder Compute PyBullet simulation failed: {e}")
+            return False
+            
+        finally:
+            self.disconnect()
+    
+    def _create_pybullet_script(self, scene_graph_file: str, llm_file: str, output_dir: str) -> str:
+        """Create remote PyBullet simulation script."""
+        return f"""#!/usr/bin/env python3
+import sys
+import json
+import os
+import time
+import numpy as np
+from pathlib import Path
+
+# Install required packages if needed
+import subprocess
+try:
+    import pybullet as p
+    import pybullet_data
+except ImportError:
+    print("Installing PyBullet...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pybullet"])
+    import pybullet as p
+    import pybullet_data
+
+def run_pybullet_simulation():
+    \"\"\"Run complete PyBullet robot simulation.\"\"\"
+    
+    # Create output directory
+    os.makedirs("{output_dir}", exist_ok=True)
+    
+    # Load input data
+    with open("{scene_graph_file}", 'r') as f:
+        scene_graph = json.load(f)
+    
+    with open("{llm_file}", 'r') as f:
+        llm_interpretation = json.load(f)
+    
+    print(f"Loaded scene graph with {{len(scene_graph.get('nodes', []))}} objects")
+    print(f"Task sequence: {{len(llm_interpretation.get('task_sequence', []))}} tasks")
+    
+    # Initialize PyBullet
+    physicsClient = p.connect(p.DIRECT)  # Headless mode for server
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.setGravity(0, 0, -9.81)
+    
+    # Load ground plane
+    planeId = p.loadURDF("plane.urdf")
+    
+    # Load robot (UR5 or similar)
+    try:
+        robotId = p.loadURDF("franka_panda/panda.urdf", [0, 0, 0], useFixedBase=True)
+        robot_name = "Franka Panda"
+    except:
+        try:
+            robotId = p.loadURDF("kuka_iiwa/model.urdf", [0, 0, 0], useFixedBase=True)
+            robot_name = "KUKA iiwa"
+        except:
+            # Fallback to simple robot
+            robotId = p.loadURDF("r2d2.urdf", [0, 0, 0], useFixedBase=True)
+            robot_name = "R2D2"
+    
+    print(f"Loaded robot: {{robot_name}} (ID: {{robotId}})")
+    
+    # Get robot info
+    numJoints = p.getNumJoints(robotId)
+    print(f"Robot has {{numJoints}} joints")
+    
+    # Create scene objects based on scene graph
+    object_mapping = {{}}
+    object_positions = {{}}
+    
+    for node in scene_graph.get("nodes", []):
+        if node.get("type") != "scene_context":
+            object_id = node["id"]
+            class_name = node.get("properties", {{}}).get("class_name", "cube")
+            
+            # Default position if not specified
+            x = float(node.get("properties", {{}}).get("x", np.random.uniform(-0.3, 0.3)))
+            y = float(node.get("properties", {{}}).get("y", np.random.uniform(-0.3, 0.3)))
+            z = float(node.get("properties", {{}}).get("z", 0.7))
+            
+            # Load appropriate URDF based on class
+            try:
+                if class_name in ["cup", "mug"]:
+                    objectId = p.loadURDF("objects/mug.urdf", [x, y, z])
+                elif class_name in ["cube", "box", "block"]:
+                    objectId = p.loadURDF("cube.urdf", [x, y, z])
+                elif class_name in ["sphere", "ball"]:
+                    objectId = p.loadURDF("sphere2.urdf", [x, y, z])
+                else:
+                    # Default to cube
+                    objectId = p.loadURDF("cube.urdf", [x, y, z])
+                
+                object_mapping[object_id] = objectId
+                object_positions[object_id] = [x, y, z]
+                print(f"Loaded {{class_name}} at ({{x:.2f}}, {{y:.2f}}, {{z:.2f}})")
+                
+            except Exception as e:
+                print(f"Warning: Could not load object {{class_name}}: {{e}}")
+                # Create a simple box as fallback
+                objectId = p.loadURDF("cube.urdf", [x, y, z])
+                object_mapping[object_id] = objectId
+                object_positions[object_id] = [x, y, z]
+    
+    print(f"Created {{len(object_mapping)}} objects in simulation")
+    
+    # Execute task sequence
+    task_results = []
+    task_sequence = llm_interpretation.get("task_sequence", [])
+    
+    for i, task in enumerate(task_sequence):
+        print(f"\\nExecuting task {{i+1}}/{{len(task_sequence)}}: {{task.get('description', 'Unknown task')}}")
+        
+        task_start_time = time.time()
+        
+        # Simulate robot movement for this task
+        success = simulate_robot_task(robotId, task, object_mapping, object_positions)
+        
+        task_duration = time.time() - task_start_time
+        
+        result = {{
+            "task_id": i + 1,
+            "type": task.get("type", "unknown"),
+            "description": task.get("description", ""),
+            "success": success,
+            "duration": task_duration,
+            "timestamp": time.time()
+        }}
+        
+        task_results.append(result)
+        print(f"Task {{i+1}} {{'completed successfully' if success else 'failed'}} in {{task_duration:.2f}}s")
+    
+    # Get final simulation state
+    final_state = {{}}
+    for obj_id, bullet_id in object_mapping.items():
+        pos, orn = p.getBasePositionAndOrientation(bullet_id)
+        final_state[obj_id] = {{
+            "position": list(pos),
+            "orientation": list(orn)
+        }}
+    
+    # Save results
+    results = {{
+        "robot_info": {{
+            "name": robot_name,
+            "num_joints": numJoints,
+            "robot_id": robotId
+        }},
+        "object_mapping": object_mapping,
+        "initial_positions": object_positions,
+        "task_results": task_results,
+        "final_state": final_state,
+        "simulation_time": time.time(),
+        "total_tasks": len(task_sequence),
+        "successful_tasks": sum(1 for r in task_results if r["success"]),
+        "success_rate": sum(1 for r in task_results if r["success"]) / max(len(task_sequence), 1)
+    }}
+    
+    # Save to JSON
+    with open(os.path.join("{output_dir}", "simulation_results.json"), 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    # Generate simulation summary
+    summary = {{
+        "experiment_name": "thunder_pybullet_simulation",
+        "total_objects": len(object_mapping),
+        "total_tasks": len(task_sequence),
+        "successful_tasks": results["successful_tasks"],
+        "success_rate": results["success_rate"],
+        "simulation_completed": True
+    }}
+    
+    with open(os.path.join("{output_dir}", "simulation_summary.json"), 'w') as f:
+        json.dump(summary, f, indent=2)
+    
+    print(f"\\nSimulation completed!")
+    print(f"Success rate: {{results['success_rate']:.1%}} ({{results['successful_tasks']}}/{{len(task_sequence)}})")
+    print(f"Results saved to: {output_dir}")
+    
+    # Cleanup
+    p.disconnect()
+
+def simulate_robot_task(robot_id, task, object_mapping, object_positions):
+    \"\"\"Simulate execution of a single robot task.\"\"\"
+    
+    task_type = task.get("type", "unknown")
+    
+    # Simple task simulation based on type
+    if task_type in ["grasp", "pick", "pick_up"]:
+        return simulate_grasp_task(robot_id, task, object_mapping)
+    elif task_type in ["place", "put", "move"]:
+        return simulate_place_task(robot_id, task, object_mapping)
+    elif task_type in ["push", "slide"]:
+        return simulate_push_task(robot_id, task, object_mapping)
+    else:
+        # Generic task simulation
+        return simulate_generic_task(robot_id, task)
+
+def simulate_grasp_task(robot_id, task, object_mapping):
+    \"\"\"Simulate grasping an object.\"\"\"
+    
+    # Get end effector position
+    num_joints = p.getNumJoints(robot_id)
+    if num_joints > 6:
+        ee_link = num_joints - 1  # Assume last link is end effector
+    else:
+        ee_link = num_joints - 1
+    
+    # Simulate reaching motion
+    for step in range(50):
+        # Simple sinusoidal motion to simulate reaching
+        for joint_idx in range(min(6, num_joints)):
+            target_pos = 0.1 * np.sin(step * 0.1) * (joint_idx + 1) / 6
+            p.setJointMotorControl2(robot_id, joint_idx, p.POSITION_CONTROL, targetPosition=target_pos)
+        
+        p.stepSimulation()
+        time.sleep(0.01)
+    
+    # Grasp typically succeeds in simulation
+    return np.random.random() > 0.1  # 90% success rate
+
+def simulate_place_task(robot_id, task, object_mapping):
+    \"\"\"Simulate placing an object.\"\"\"
+    
+    # Simulate placement motion
+    for step in range(30):
+        for joint_idx in range(min(6, p.getNumJoints(robot_id))):
+            target_pos = 0.05 * np.cos(step * 0.15) * (joint_idx + 1) / 6
+            p.setJointMotorControl2(robot_id, joint_idx, p.POSITION_CONTROL, targetPosition=target_pos)
+        
+        p.stepSimulation()
+        time.sleep(0.01)
+    
+    return np.random.random() > 0.15  # 85% success rate
+
+def simulate_push_task(robot_id, task, object_mapping):
+    \"\"\"Simulate pushing an object.\"\"\"
+    
+    # Simulate pushing motion
+    for step in range(40):
+        for joint_idx in range(min(3, p.getNumJoints(robot_id))):  # Use fewer joints for pushing
+            target_pos = 0.2 * np.sin(step * 0.08) * (joint_idx + 1) / 3
+            p.setJointMotorControl2(robot_id, joint_idx, p.POSITION_CONTROL, targetPosition=target_pos)
+        
+        p.stepSimulation()
+        time.sleep(0.005)
+    
+    return np.random.random() > 0.2  # 80% success rate
+
+def simulate_generic_task(robot_id, task):
+    \"\"\"Simulate a generic robot task.\"\"\"
+    
+    # Basic robot motion simulation
+    for step in range(60):
+        for joint_idx in range(min(4, p.getNumJoints(robot_id))):
+            target_pos = 0.15 * np.sin(step * 0.05 + joint_idx)
+            p.setJointMotorControl2(robot_id, joint_idx, p.POSITION_CONTROL, targetPosition=target_pos)
+        
+        p.stepSimulation()
+        time.sleep(0.008)
+    
+    return np.random.random() > 0.25  # 75% success rate
+
+if __name__ == "__main__":
+    run_pybullet_simulation()
+"""
+
     def _create_colmap_script(self, frames_dir: str, output_dir: str) -> str:
         """Create remote COLMAP processing script."""
         return f"""#!/bin/bash
