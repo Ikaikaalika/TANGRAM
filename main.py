@@ -1,52 +1,346 @@
 #!/usr/bin/env python3
+"""
+TANGRAM Main Pipeline Controller
+
+This is the main entry point for the TANGRAM robotic scene understanding pipeline.
+It orchestrates all components and provides flexible execution modes.
+
+For portfolio demos, use demo.py instead of this file.
+
+Usage:
+    python main.py --input video.mp4 --mode full
+    python main.py --input video.mp4 --mode track --output results/
+    
+Author: TANGRAM Team
+License: MIT
+"""
 
 import argparse
 import sys
 import os
+from pathlib import Path
 
 # Add project modules to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = Path(__file__).parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from tracker.track_objects import ObjectTracker
+from config import *
+from utils.logging_utils import setup_logger, log_pipeline_step
+from tracker.track_objects import YOLOByteTracker
 from segmenter.run_sam import SAMSegmenter
+from reconstruction.triangulate import PointTriangulator
 from scene_graph.build_graph import SceneGraphBuilder
 from robotics.simulation_env import RoboticsSimulation
-from llm.interpret_scene import SceneInterpreter
+from llm.interpret_scene import DeepSeekSceneInterpreter
 from visualization.render_graph import GraphVisualizer
+from export.results_exporter import ResultsExporter
+
+logger = setup_logger(__name__)
+
+class TANGRAMPipeline:
+    """
+    Main TANGRAM pipeline controller.
+    
+    Coordinates execution of all pipeline components with flexible
+    mode selection and comprehensive logging.
+    """
+    
+    def __init__(self, input_path: str, output_dir: str = "output", 
+                 experiment_name: str = None):
+        """
+        Initialize pipeline controller.
+        
+        Args:
+            input_path: Path to input video file
+            output_dir: Output directory for results
+            experiment_name: Name for this pipeline run
+        """
+        self.input_path = Path(input_path)
+        self.output_dir = Path(output_dir)
+        self.experiment_name = experiment_name or f"pipeline_{int(time.time())}"
+        
+        # Create output directory
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize components
+        self.tracker = YOLOByteTracker()
+        self.segmenter = SAMSegmenter()
+        self.triangulator = PointTriangulator()
+        self.scene_builder = SceneGraphBuilder()
+        self.llm_interpreter = DeepSeekSceneInterpreter()
+        self.visualizer = GraphVisualizer()
+        self.exporter = ResultsExporter(self.experiment_name)
+        
+        logger.info(f"Initialized pipeline for: {self.input_path}")
+        logger.info(f"Output directory: {self.output_dir}")
+    
+    @log_pipeline_step("Object Detection and Tracking")
+    def run_tracking(self):
+        """Run object detection and tracking."""
+        logger.info("Starting object tracking...")
+        
+        tracking_results = self.tracker.process_video(
+            str(self.input_path),
+            output_dir=str(TRACKING_DIR)
+        )
+        
+        logger.info(f"Tracking completed: {len(tracking_results)} frames processed")
+        return tracking_results
+    
+    @log_pipeline_step("Object Segmentation")
+    def run_segmentation(self):
+        """Run SAM segmentation on tracked objects."""
+        logger.info("Starting object segmentation...")
+        
+        # Load tracking results
+        tracking_file = TRACKING_DIR / "tracking_results.json"
+        if not tracking_file.exists():
+            logger.error("Tracking results not found. Run tracking first.")
+            return None
+        
+        import json
+        with open(tracking_file, 'r') as f:
+            tracking_results = json.load(f)
+        
+        segmentation_results = self.segmenter.process_video_with_tracking(
+            str(self.input_path),
+            tracking_results,
+            output_dir=str(MASKS_DIR)
+        )
+        
+        logger.info(f"Segmentation completed: {len(segmentation_results)} frames processed")
+        return segmentation_results
+    
+    @log_pipeline_step("3D Reconstruction")
+    def run_reconstruction(self):
+        """Run 3D reconstruction pipeline."""
+        logger.info("Starting 3D reconstruction...")
+        
+        # Extract frames
+        from reconstruction.extract_frames import extract_frames
+        success = extract_frames(
+            str(self.input_path),
+            str(FRAMES_DIR),
+            frame_interval=5,
+            max_frames=100
+        )
+        
+        if not success:
+            logger.error("Frame extraction failed")
+            return None
+        
+        # Run COLMAP (would need to be implemented)
+        logger.info("Note: COLMAP reconstruction should be run separately")
+        logger.info("Using mock 3D positions for pipeline demonstration")
+        
+        # For now, create mock positions
+        mock_positions = self._create_mock_3d_positions()
+        
+        # Save to expected location
+        import json
+        with open(RECONSTRUCTION_DIR / "object_3d_positions.json", 'w') as f:
+            json.dump(mock_positions, f, indent=2)
+        
+        return mock_positions
+    
+    def _create_mock_3d_positions(self):
+        """Create mock 3D positions for demonstration."""
+        # This would be replaced by actual COLMAP results
+        return {
+            "1": {"position": [0.2, 0.1, 0.7], "class_name": "bottle", "num_observations": 15},
+            "2": {"position": [-0.1, 0.3, 0.7], "class_name": "cup", "num_observations": 12},
+            "3": {"position": [0.3, -0.2, 0.7], "class_name": "book", "num_observations": 8}
+        }
+    
+    @log_pipeline_step("Scene Graph Construction")
+    def build_scene_graph(self):
+        """Build scene graph from tracking and 3D data."""
+        logger.info("Building scene graph...")
+        
+        tracking_file = TRACKING_DIR / "tracking_results.json"
+        positions_file = RECONSTRUCTION_DIR / "object_3d_positions.json"
+        
+        if not (tracking_file.exists() and positions_file.exists()):
+            logger.error("Required input files not found for scene graph")
+            return None
+        
+        scene_graph = self.scene_builder.build_complete_graph(
+            str(tracking_file),
+            str(positions_file),
+            output_dir=str(GRAPHS_DIR)
+        )
+        
+        # Generate visualization
+        self.visualizer.set_graph(scene_graph)
+        viz_output = GRAPHS_DIR / "scene_graph_visualization.png"
+        self.visualizer.render_2d_graph(str(viz_output))
+        
+        logger.info("Scene graph construction completed")
+        return scene_graph
+    
+    @log_pipeline_step("LLM Scene Interpretation")
+    def run_llm_interpretation(self, goal: str = "Clear the table"):
+        """Run LLM interpretation and task planning."""
+        logger.info(f"Running LLM interpretation with goal: {goal}")
+        
+        graph_file = GRAPHS_DIR / "scene_graph.json"
+        if not graph_file.exists():
+            logger.error("Scene graph not found for LLM interpretation")
+            return None
+        
+        interpretation = self.llm_interpreter.process_scene_graph_file(
+            str(graph_file),
+            goal=goal,
+            output_dir=str(GRAPHS_DIR)
+        )
+        
+        logger.info("LLM interpretation completed")
+        return interpretation
+    
+    @log_pipeline_step("Robot Simulation")
+    def run_simulation(self, gui: bool = False):
+        """Run robot simulation."""
+        logger.info("Starting robot simulation...")
+        
+        # Load required data
+        positions_file = RECONSTRUCTION_DIR / "object_3d_positions.json"
+        interpretation_file = GRAPHS_DIR / "llm_interpretation.json"
+        
+        if not (positions_file.exists() and interpretation_file.exists()):
+            logger.error("Required files not found for simulation")
+            return None
+        
+        # Initialize simulation
+        sim = RoboticsSimulation(gui=gui)
+        
+        if not sim.initialize_simulation():
+            logger.error("Failed to initialize simulation")
+            return None
+        
+        if not sim.load_robot():
+            logger.error("Failed to load robot")
+            return None
+        
+        # Load data
+        import json
+        with open(positions_file, 'r') as f:
+            object_positions = json.load(f)
+        
+        with open(interpretation_file, 'r') as f:
+            interpretation = json.load(f)
+        
+        # Add objects and run tasks
+        object_mapping = sim.add_scene_objects(object_positions)
+        task_sequence = interpretation.get("task_sequence", [])
+        
+        task_results = sim.execute_task_sequence(task_sequence, object_mapping)
+        
+        # Save results
+        output_file = SIMULATION_DIR / "simulation_results.json"
+        sim.save_simulation_results(str(output_file))
+        
+        sim.cleanup()
+        
+        logger.info("Robot simulation completed")
+        return task_results
+    
+    def run_full_pipeline(self, goal: str = "Clear the table", gui: bool = False):
+        """Run the complete TANGRAM pipeline."""
+        logger.info("Starting full TANGRAM pipeline...")
+        
+        try:
+            # Step 1: Tracking
+            tracking_results = self.run_tracking()
+            if not tracking_results:
+                return False
+            
+            # Step 2: Segmentation
+            segmentation_results = self.run_segmentation()
+            if not segmentation_results:
+                return False
+            
+            # Step 3: 3D Reconstruction
+            reconstruction_results = self.run_reconstruction()
+            if not reconstruction_results:
+                return False
+            
+            # Step 4: Scene Graph
+            scene_graph = self.build_scene_graph()
+            if not scene_graph:
+                return False
+            
+            # Step 5: LLM Interpretation
+            interpretation = self.run_llm_interpretation(goal)
+            if not interpretation:
+                return False
+            
+            # Step 6: Robot Simulation
+            simulation_results = self.run_simulation(gui)
+            if not simulation_results:
+                return False
+            
+            # Step 7: Export Results
+            export_summary = self.exporter.export_complete_report(str(self.input_path))
+            
+            logger.info("Full pipeline completed successfully!")
+            logger.info(f"Results exported to: {export_summary['export_directory']}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Pipeline failed: {e}")
+            return False
 
 def main():
-    parser = argparse.ArgumentParser(description="Robotic Scene Understanding Pipeline")
+    """Main entry point for TANGRAM pipeline."""
+    parser = argparse.ArgumentParser(description="TANGRAM Robotic Scene Understanding Pipeline")
     parser.add_argument("--input", "-i", required=True, help="Input video file")
     parser.add_argument("--output", "-o", default="output", help="Output directory")
-    parser.add_argument("--mode", choices=["track", "segment", "reconstruct", "graph", "simulate"], 
-                       default="track", help="Processing mode")
+    parser.add_argument("--mode", choices=["track", "segment", "reconstruct", "graph", "llm", "simulate", "full"], 
+                       default="full", help="Processing mode")
     parser.add_argument("--gui", action="store_true", help="Show GUI for simulation")
+    parser.add_argument("--goal", default="Clear the table", help="Goal for LLM task planning")
+    parser.add_argument("--name", help="Experiment name")
     
     args = parser.parse_args()
     
-    print(f"Processing {args.input} in {args.mode} mode")
-    print(f"Output directory: {args.output}")
+    # Check input file
+    if not Path(args.input).exists():
+        print(f"Error: Input file not found: {args.input}")
+        return 1
+    
+    print(f"TANGRAM Pipeline")
+    print(f"Input: {args.input}")
+    print(f"Mode: {args.mode}")
+    print(f"Output: {args.output}")
+    
+    # Initialize pipeline
+    pipeline = TANGRAMPipeline(args.input, args.output, args.name)
+    
+    # Run selected mode
+    success = True
     
     if args.mode == "track":
-        tracker = ObjectTracker()
-        print("Running object tracking...")
-    
+        success = pipeline.run_tracking() is not None
     elif args.mode == "segment":
-        segmenter = SAMSegmenter()
-        print("Running segmentation...")
-    
+        success = pipeline.run_segmentation() is not None
+    elif args.mode == "reconstruct":
+        success = pipeline.run_reconstruction() is not None
     elif args.mode == "graph":
-        graph_builder = SceneGraphBuilder()
-        print("Building scene graph...")
-    
+        success = pipeline.build_scene_graph() is not None
+    elif args.mode == "llm":
+        success = pipeline.run_llm_interpretation(args.goal) is not None
     elif args.mode == "simulate":
-        sim = RoboticsSimulation(gui=args.gui)
-        print("Starting simulation...")
+        success = pipeline.run_simulation(args.gui) is not None
+    elif args.mode == "full":
+        success = pipeline.run_full_pipeline(args.goal, args.gui)
     
+    if success:
+        print("✅ Pipeline completed successfully!")
+        return 0
     else:
-        print("Running full pipeline...")
-        # Integrate all modules
-        pass
+        print("❌ Pipeline failed. Check logs for details.")
+        return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
