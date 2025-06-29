@@ -2,86 +2,57 @@
 """
 TANGRAM GUI Launcher
 
-Simple launcher script for the TANGRAM GUI application.
-
-Usage:
-    python launch_gui.py
-
-Author: TANGRAM Team
-License: MIT
+Simple launcher script for the TANGRAM management GUI.
+Handles dependencies and provides fallback options.
 """
 
 import sys
-import os
+import subprocess
 from pathlib import Path
 
-# Add project root to path
-PROJECT_ROOT = Path(__file__).parent
-sys.path.insert(0, str(PROJECT_ROOT))
-
 def check_dependencies():
-    """Check required dependencies for GUI."""
-    missing_deps = []
-    
+    """Check if required dependencies are available."""
     try:
         import tkinter
+        return True
     except ImportError:
-        missing_deps.append("tkinter")
-    
-    try:
-        import PIL
-    except ImportError:
-        missing_deps.append("Pillow")
-    
-    try:
-        import cv2
-    except ImportError:
-        missing_deps.append("opencv-python")
-    
-    try:
-        import numpy
-    except ImportError:
-        missing_deps.append("numpy")
-    
-    if missing_deps:
-        print("❌ Missing required dependencies:")
-        for dep in missing_deps:
-            print(f"   - {dep}")
-        print("\nPlease install missing dependencies:")
-        print(f"   pip install {' '.join(missing_deps)}")
+        print("❌ tkinter is not available")
+        print("On macOS: tkinter should be included with Python")
+        print("On Ubuntu/Debian: sudo apt-get install python3-tk")
+        print("On CentOS/RHEL: sudo yum install tkinter")
         return False
-    
-    return True
 
 def main():
-    """Main launcher function."""
-    print("🚀 TANGRAM GUI Launcher")
+    """Launch the TANGRAM GUI."""
+    print("🚀 TANGRAM Pipeline Manager")
     print("=" * 40)
     
     # Check dependencies
-    print("Checking dependencies...")
     if not check_dependencies():
         return 1
     
-    print("✅ All dependencies available")
-    
-    # Check if GUI files exist
-    gui_module = PROJECT_ROOT / "gui" / "tangram_gui.py"
-    if not gui_module.exists():
-        print(f"❌ GUI module not found: {gui_module}")
-        return 1
-    
-    print("✅ GUI module found")
-    
     # Launch GUI
     try:
-        print("🎯 Launching TANGRAM GUI...")
-        from gui.tangram_gui import main as gui_main
-        return gui_main()
+        gui_path = Path(__file__).parent / "gui" / "tangram_manager.py"
         
-    except Exception as e:
-        print(f"❌ Failed to launch GUI: {e}")
+        if not gui_path.exists():
+            print(f"❌ GUI file not found: {gui_path}")
+            return 1
+        
+        print("✅ Launching TANGRAM Manager...")
+        subprocess.run([sys.executable, str(gui_path)], check=True)
+        
+    except KeyboardInterrupt:
+        print("\n👋 TANGRAM Manager closed")
+        return 0
+    except subprocess.CalledProcessError as e:
+        print(f"❌ GUI failed to start: {e}")
         return 1
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        return 1
+    
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())

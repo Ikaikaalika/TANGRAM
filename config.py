@@ -160,10 +160,17 @@ HARDWARE_CONFIG = {
     "num_workers": 4,  # For multiprocessing
     "memory_limit_gb": 8,  # Memory usage limit
     "thunder_compute": {
-        "enabled": False,  # Set to True when using Thunder Compute
-        "ssh_host": None,  # Thunder Compute SSH host
-        "ssh_user": None,  # SSH username
-        "remote_data_dir": "/tmp/tangram_data"
+        "enabled": True,  # Set to True when using Thunder Compute
+        "ssh_host": None,  # Will be set dynamically from tnr status
+        "ssh_user": "ubuntu",  # Default Thunder Compute user
+        "remote_data_dir": "/tmp/tangram_data",
+        "cli_command": "tnr",  # Thunder Compute CLI command
+        "auto_create_instance": True,  # Auto-create instance if none exists
+        "instance_config": {
+            "gpu": "a100",  # or "t4", "a100xl"
+            "vcpus": 4,
+            "mode": "prototyping"
+        }
     }
 }
 
