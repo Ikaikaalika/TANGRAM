@@ -30,7 +30,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
 # Add project root to path
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import HARDWARE_CONFIG, DATA_DIR, RESULTS_DIR
@@ -420,16 +420,13 @@ class ThunderComputePanel:
         """Set instance mode and update button states."""
         mode_var.set(mode)
         
-        # Configure button styling for toggle effect
-        selected_style = {'relief': 'sunken', 'background': '#0078d4', 'foreground': 'white'}
-        normal_style = {'relief': 'raised', 'background': 'SystemButtonFace', 'foreground': 'black'}
-        
+        # Configure button styling for toggle effect using text styling
         if mode == "prototyping":
-            proto_button.config(**selected_style)
-            prod_button.config(**normal_style)
+            proto_button.config(text="✓ Prototyping\n(Cost Optimized)")
+            prod_button.config(text="Production\n(High Reliability)")
         else:
-            proto_button.config(**normal_style)
-            prod_button.config(**selected_style)
+            proto_button.config(text="Prototyping\n(Cost Optimized)")
+            prod_button.config(text="✓ Production\n(High Reliability)")
     
     def start_instance(self):
         """Start selected instance."""

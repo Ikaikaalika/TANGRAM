@@ -23,22 +23,23 @@ from pathlib import Path
 # Add project modules to path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from config import (
     FRAME_EXTRACTION_CONFIG, SAM_CONFIG, YOLO_CONFIG, 
     COLMAP_CONFIG, PYBULLET_CONFIG, HARDWARE_CONFIG,
     SCENE_GRAPH_CONFIG, LLM_CONFIG, DATA_DIR, RESULTS_DIR
 )
-from utils.logging_utils import setup_logger, log_pipeline_step
-from utils.mock_data import create_mock_3d_positions
-from tracker.track_objects import YOLOByteTracker
-from segmenter.run_sam import SAMSegmenter
-from reconstruction.triangulate import PointTriangulator
-from scene_graph.build_graph import SceneGraphBuilder
-from robotics.simulation_env import RoboticsSimulation
-from llm.interpret_scene import DeepSeekSceneInterpreter
-from visualization.render_graph import GraphVisualizer
-from export.results_exporter import ResultsExporter
+from src.tangram.utils.logging_utils import setup_logger, log_pipeline_step
+from src.tangram.utils.mock_data import create_mock_3d_positions
+from src.tangram.core.tracker.track_objects import YOLOByteTracker
+from src.tangram.core.segmenter.run_sam import SAMSegmenter
+from src.tangram.core.reconstruction.triangulate import PointTriangulator
+from src.tangram.core.scene_graph.build_graph import SceneGraphBuilder
+from src.tangram.core.robotics.simulation_env import RoboticsSimulation
+from src.tangram.core.llm.interpret_scene import DeepSeekSceneInterpreter
+from src.tangram.core.visualization.render_graph import GraphVisualizer
+from src.tangram.core.export.results_exporter import ResultsExporter
 
 logger = setup_logger(__name__)
 

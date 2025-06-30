@@ -20,23 +20,24 @@ from pathlib import Path
 import logging
 
 # Add project root to path
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from config import (
     FRAME_EXTRACTION_CONFIG, SAM_CONFIG, YOLO_CONFIG, 
     COLMAP_CONFIG, PYBULLET_CONFIG, HARDWARE_CONFIG,
     SCENE_GRAPH_CONFIG, LLM_CONFIG, DATA_DIR, RESULTS_DIR
 )
-from utils.logging_utils import setup_logger, log_pipeline_step
-from utils.video_utils import validate_video_file, extract_video_info
-from tracker.track_objects import YOLOByteTracker
-from segmenter.run_sam import SAMSegmenter  
-from reconstruction.triangulate import PointTriangulator
-from scene_graph.build_graph import SceneGraphBuilder
-from llm.interpret_scene import DeepSeekSceneInterpreter
-from robotics.simulation_env import RoboticsSimulation
-from export.results_exporter import ResultsExporter
+from src.tangram.utils.logging_utils import setup_logger, log_pipeline_step
+from src.tangram.utils.video_utils import validate_video_file, extract_video_info
+from src.tangram.core.tracker.track_objects import YOLOByteTracker
+from src.tangram.core.segmenter.run_sam import SAMSegmenter  
+from src.tangram.core.reconstruction.triangulate import PointTriangulator
+from src.tangram.core.scene_graph.build_graph import SceneGraphBuilder
+from src.tangram.core.llm.interpret_scene import DeepSeekSceneInterpreter
+from src.tangram.core.robotics.simulation_env import RoboticsSimulation
+from src.tangram.core.export.results_exporter import ResultsExporter
 
 logger = setup_logger(__name__, "demo.log")
 

@@ -33,7 +33,7 @@ def main():
     
     # Launch GUI
     try:
-        gui_path = Path(__file__).parent / "gui" / "tangram_manager.py"
+        gui_path = Path(__file__).parent / "src" / "tangram" / "gui" / "tangram_manager.py"
         
         if not gui_path.exists():
             print(f"❌ GUI file not found: {gui_path}")
