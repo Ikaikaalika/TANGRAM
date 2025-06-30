@@ -24,8 +24,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import *
+from config import (
+    FRAME_EXTRACTION_CONFIG, SAM_CONFIG, YOLO_CONFIG, 
+    COLMAP_CONFIG, PYBULLET_CONFIG, HARDWARE_CONFIG,
+    SCENE_GRAPH_CONFIG, LLM_CONFIG, DATA_DIR, RESULTS_DIR
+)
 from utils.logging_utils import setup_logger, log_pipeline_step
+from utils.mock_data import create_mock_3d_positions
 from tracker.track_objects import YOLOByteTracker
 from segmenter.run_sam import SAMSegmenter
 from reconstruction.triangulate import PointTriangulator
@@ -134,7 +139,7 @@ class TANGRAMPipeline:
         logger.info("Using mock 3D positions for pipeline demonstration")
         
         # For now, create mock positions
-        mock_positions = self._create_mock_3d_positions()
+        mock_positions = create_mock_3d_positions()
         
         # Save to expected location
         import json
@@ -143,14 +148,6 @@ class TANGRAMPipeline:
         
         return mock_positions
     
-    def _create_mock_3d_positions(self):
-        """Create mock 3D positions for demonstration."""
-        # This would be replaced by actual COLMAP results
-        return {
-            "1": {"position": [0.2, 0.1, 0.7], "class_name": "bottle", "num_observations": 15},
-            "2": {"position": [-0.1, 0.3, 0.7], "class_name": "cup", "num_observations": 12},
-            "3": {"position": [0.3, -0.2, 0.7], "class_name": "book", "num_observations": 8}
-        }
     
     @log_pipeline_step("Scene Graph Construction")
     def build_scene_graph(self):

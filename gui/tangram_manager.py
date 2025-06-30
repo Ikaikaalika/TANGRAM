@@ -28,7 +28,6 @@ from typing import Dict, List, Any, Optional
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
-import tkinter.font as tkFont
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -404,8 +403,18 @@ class ThunderComputePanel:
     
     def update_gpu_selection(self, gpu_buttons, selected_value):
         """Update GPU selection visual feedback."""
-        # This method can be used for future visual enhancements
-        pass
+        # Update visual feedback for selected GPU card
+        for gpu_info in [
+            {"name": "T4", "value": "t4", "memory": "16GB", "desc": "Cost-effective for most ML workloads"},
+            {"name": "A100", "value": "a100", "memory": "40GB", "desc": "High-performance for large models"},  
+            {"name": "A100 XL", "value": "a100xl", "memory": "80GB", "desc": "Maximum performance"}
+        ]:
+            if gpu_info["value"] in gpu_buttons:
+                button = gpu_buttons[gpu_info["value"]]
+                if gpu_info["value"] == selected_value:
+                    button.config(relief='sunken', background='#e3f2fd')
+                else:
+                    button.config(relief='raised', background='SystemButtonFace')
     
     def set_mode(self, mode_var, mode, proto_button, prod_button):
         """Set instance mode and update button states."""

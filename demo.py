@@ -23,7 +23,11 @@ import logging
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import *
+from config import (
+    FRAME_EXTRACTION_CONFIG, SAM_CONFIG, YOLO_CONFIG, 
+    COLMAP_CONFIG, PYBULLET_CONFIG, HARDWARE_CONFIG,
+    SCENE_GRAPH_CONFIG, LLM_CONFIG, DATA_DIR, RESULTS_DIR
+)
 from utils.logging_utils import setup_logger, log_pipeline_step
 from utils.video_utils import validate_video_file, extract_video_info
 from tracker.track_objects import YOLOByteTracker
