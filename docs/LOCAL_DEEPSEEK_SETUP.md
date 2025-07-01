@@ -1,21 +1,25 @@
-# 🌩️ DeepSeek on Thunder Compute Setup Guide
+# 🔒 LOCAL-ONLY DeepSeek on Thunder Compute
 
-This guide shows you how to run DeepSeek locally on Thunder Compute instead of using the external API.
+**ZERO EXTERNAL API CALLS - 100% LOCAL INFERENCE**
 
-## 🎯 Why Local DeepSeek?
+This guide sets up DeepSeek to run entirely on your Thunder Compute instance with **NO external API calls whatsoever**.
 
-- **Data Privacy**: Keep your scene data on your Thunder instance
-- **No API Costs**: Only pay for Thunder Compute time (~$0.50/run instead of $0.50 + API fees)
-- **Faster Inference**: Reduce network latency
-- **Offline Capability**: Works without internet after setup
+## 🎯 Why LOCAL-ONLY DeepSeek?
 
-## 💰 Updated Cost Estimate
+- **🔒 Complete Data Privacy**: Zero external API calls - all data stays on your instance
+- **💰 No API Costs**: Eliminate all DeepSeek API fees (was ~$0.005/call)
+- **🚀 Faster Inference**: No network latency to external services  
+- **🌐 Offline Capable**: Works without internet after setup
+- **🛡️ Security Compliance**: No data leaves your Thunder instance
 
-### **With Local DeepSeek:**
-- **A100 Instance**: ~$1.70/hour (need GPU for LLM inference)
+## 💰 Cost Analysis (LOCAL-ONLY)
+
+### **Complete Local Setup:**
+- **A100 Instance**: ~$1.70/hour (required for local LLM inference)
 - **15-minute simulation**: ~$0.43
-- **API costs**: $0 (no external calls)
-- **Total**: ~$0.43 per run
+- **External API costs**: **$0** (ZERO external calls)
+- **Data egress costs**: **$0** (no data leaves Thunder instance)
+- **Total**: ~$0.43 per run with **complete privacy**
 
 ### **Recommended Configuration:**
 ```bash
@@ -89,23 +93,26 @@ python main.py --input video.mp4 --mode full
 python examples/demo.py --use-mock-data
 ```
 
-## ⚙️ Configuration Details
+## ⚙️ Configuration Details (LOCAL-ONLY)
 
-The system automatically detects and uses local LLM when configured:
+**NO EXTERNAL API FALLBACKS** - System enforces local-only operation:
 
 ```python
-# In config.py - already set up for you:
+# In config.py - ZERO external API calls:
 LLM_CONFIG = {
-    "provider": "local",  # Uses local Ollama
+    "provider": "local",  # MUST be local
     "local": {
         "enabled": True,
         "host": "localhost", 
         "port": 11434,
         "model": "deepseek-r1:latest",
-        "fallback_to_api": True  # Falls back if local fails
+        "fallback_to_api": False,  # DISABLED - no external APIs
+        "require_local": True      # Fail if local unavailable
     }
 }
 ```
+
+**Enforcement:** System will **crash with error** if local LLM unavailable rather than making external API calls.
 
 ## 🔧 Troubleshooting
 
@@ -142,24 +149,26 @@ pip3 install --user requests ollama-python
 python -c "from src.tangram.core.llm.local_llm_client import LocalLLMClient; print('OK')"
 ```
 
-## 🔄 Switching Between Local and API
+## 🔒 LOCAL-ONLY Operation
 
-You can easily switch between local and API-based inference:
+**NO API OPTIONS** - System is configured for local-only operation:
 
-### **Use Local DeepSeek:**
+### **Enforced Local Operation:**
 ```python
-# In config.py
-LLM_CONFIG["provider"] = "local"
+# ONLY valid configuration:
+LLM_CONFIG["provider"] = "local"  # REQUIRED
+LLM_CONFIG["local"]["fallback_to_api"] = False  # DISABLED
 ```
 
-### **Use API DeepSeek:**
-```python
-# In config.py  
-LLM_CONFIG["provider"] = "deepseek"
-```
+### **Error Behavior:**
+- **If local LLM unavailable**: System crashes with clear error message
+- **No silent fallbacks**: Never makes external API calls
+- **Explicit failures**: You know immediately if local setup has issues
 
-### **Automatic Fallback:**
-The system automatically falls back to API if local inference fails.
+### **Privacy Guarantee:**
+✅ **ZERO network calls to external LLM APIs**  
+✅ **All inference happens on your Thunder instance**  
+✅ **Complete data isolation**
 
 ## 📊 Performance Comparison
 

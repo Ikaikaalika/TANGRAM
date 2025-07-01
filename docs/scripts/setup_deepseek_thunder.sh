@@ -19,8 +19,10 @@ License: MIT
 
 set -e  # Exit on any error
 
-echo "🌩️ Setting up DeepSeek on Thunder Compute"
-echo "=========================================="
+echo "🌩️ Setting up LOCAL-ONLY DeepSeek on Thunder Compute"
+echo "====================================================="
+echo "⚠️  NO EXTERNAL API CALLS - 100% LOCAL INFERENCE ONLY"
+echo ""
 
 # Color codes for output
 GREEN='\033[0;32m'
@@ -183,10 +185,13 @@ setup_tangram_integration() {
         "host": "localhost",
         "port": 11434,
         "model": "$(ollama list | grep deepseek | head -1 | awk '{print $1}')",
-        "fallback_to_api": true
+        "fallback_to_api": false,
+        "external_apis_disabled": true,
+        "local_only": true
     },
     "setup_completed": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "thunder_instance": "$(hostname)"
+    "thunder_instance": "$(hostname)",
+    "privacy_mode": "COMPLETE_LOCAL_ONLY"
 }
 EOF
     

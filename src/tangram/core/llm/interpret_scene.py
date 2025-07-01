@@ -16,32 +16,46 @@ from config import LLM_CONFIG
 
 def create_scene_interpreter():
     """
-    Factory function to create appropriate scene interpreter based on configuration.
+    Factory function to create LOCAL ONLY scene interpreter.
+    NO EXTERNAL API CALLS ALLOWED.
     
     Returns:
-        Scene interpreter instance (local or API-based)
+        Local scene interpreter instance
+        
+    Raises:
+        RuntimeError: If local LLM is not available and required
     """
-    if LLM_CONFIG.get("provider") == "local" and LOCAL_LLM_AVAILABLE:
-        if LLM_CONFIG["local"]["enabled"]:
-            try:
-                local_config = LLM_CONFIG["local"]
-                llm_client = LocalLLMClient(
-                    model_name=local_config["model"],
-                    ollama_host=local_config["host"],
-                    ollama_port=local_config["port"],
-                    fallback_to_api=local_config["fallback_to_api"]
-                )
-                return LocalDeepSeekInterpreter(llm_client)
-            except Exception as e:
-                print(f"Failed to initialize local LLM, falling back to API: {e}")
-                return DeepSeekSceneInterpreter()
+    if LLM_CONFIG.get("provider") != "local":
+        raise RuntimeError("LLM provider must be 'local' - no external APIs allowed")
     
-    # Default to API-based interpreter
-    if LLM_CONFIG.get("provider") == "deepseek":
-        deepseek_config = LLM_CONFIG["deepseek"]
-        return DeepSeekSceneInterpreter(base_url=deepseek_config["base_url"])
-    else:
-        return DeepSeekSceneInterpreter()
+    if not LOCAL_LLM_AVAILABLE:
+        raise RuntimeError("Local LLM client not available - cannot import local_llm_client module")
+    
+    local_config = LLM_CONFIG["local"]
+    if not local_config["enabled"]:
+        raise RuntimeError("Local LLM is disabled in configuration")
+    
+    try:
+        llm_client = LocalLLMClient(
+            model_name=local_config["model"],
+            ollama_host=local_config["host"],
+            ollama_port=local_config["port"],
+            fallback_to_api=False  # NEVER fallback to API
+        )
+        
+        if local_config.get("require_local", True) and not llm_client.is_available:
+            raise RuntimeError(
+                f"Local LLM required but not available. "
+                f"Please run setup script: docs/scripts/setup_deepseek_thunder.sh"
+            )
+        
+        return LocalDeepSeekInterpreter(llm_client)
+        
+    except Exception as e:
+        if local_config.get("require_local", True):
+            raise RuntimeError(f"Failed to initialize required local LLM: {e}")
+        else:
+            raise
 
 class DeepSeekSceneInterpreter:
     def __init__(self, api_key: str = None, base_url: str = "https://api.deepseek.com"):

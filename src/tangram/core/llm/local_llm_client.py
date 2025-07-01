@@ -36,7 +36,7 @@ class LocalLLMClient:
                  model_name: str = "deepseek-r1:latest",
                  ollama_host: str = "localhost",
                  ollama_port: int = 11434,
-                 fallback_to_api: bool = True):
+                 fallback_to_api: bool = False):
         """
         Initialize local LLM client.
         
@@ -125,10 +125,11 @@ class LocalLLMClient:
             Dictionary with response and metadata
         """
         if not self.is_available:
-            if self.fallback_to_api:
-                return self._fallback_to_api(prompt, system_prompt, max_tokens, temperature)
-            else:
-                raise RuntimeError("Local LLM not available and fallback disabled")
+            raise RuntimeError(
+                "Local LLM not available. External APIs are disabled. "
+                "Please ensure Ollama is running and DeepSeek model is installed. "
+                "Run: docs/scripts/setup_deepseek_thunder.sh"
+            )
         
         try:
             # Prepare the prompt
@@ -169,60 +170,12 @@ class LocalLLMClient:
                 }
             else:
                 logger.error(f"Local LLM request failed: {response.text}")
-                if self.fallback_to_api:
-                    return self._fallback_to_api(prompt, system_prompt, max_tokens, temperature)
-                else:
-                    raise RuntimeError(f"Local LLM request failed: {response.text}")
+                raise RuntimeError(f"Local LLM request failed: {response.text}. External APIs disabled.")
                     
         except Exception as e:
             logger.error(f"Error with local LLM: {e}")
-            if self.fallback_to_api:
-                return self._fallback_to_api(prompt, system_prompt, max_tokens, temperature)
-            else:
-                raise
+            raise RuntimeError(f"Local LLM error: {e}. External APIs disabled.")
     
-    def _fallback_to_api(self, prompt: str, system_prompt: str, max_tokens: int, temperature: float) -> Dict[str, Any]:
-        """Fallback to external DeepSeek API."""
-        logger.info("Falling back to DeepSeek API")
-        
-        # Import the original API client
-        from src.tangram.core.llm.interpret_scene import DeepSeekSceneInterpreter
-        
-        api_client = DeepSeekSceneInterpreter()
-        
-        # Convert to API format and make request
-        try:
-            # This is a simplified fallback - you may need to adapt based on your API usage
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-            
-            response = requests.post(
-                f"{api_client.base_url}/chat/completions",
-                headers=api_client.headers,
-                json={
-                    "model": LLM_CONFIG["model"],
-                    "messages": messages,
-                    "max_tokens": max_tokens,
-                    "temperature": temperature
-                }
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return {
-                    "content": result["choices"][0]["message"]["content"],
-                    "model": LLM_CONFIG["model"],
-                    "usage": result.get("usage", {}),
-                    "source": "api_fallback"
-                }
-            else:
-                raise RuntimeError(f"API fallback failed: {response.text}")
-                
-        except Exception as e:
-            logger.error(f"API fallback failed: {e}")
-            raise
 
 
 class LocalDeepSeekInterpreter:

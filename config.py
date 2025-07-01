@@ -100,21 +100,17 @@ SCENE_GRAPH_CONFIG = {
     }
 }
 
-# LLM Configuration
+# LLM Configuration - LOCAL ONLY (No External APIs)
 LLM_CONFIG = {
-    "provider": "local",  # Options: local, deepseek, openai
+    "provider": "local",  # MUST be local - no external APIs allowed
     "local": {
         "enabled": True,
         "host": "localhost",
         "port": 11434,
         "model": "deepseek-r1:latest",
-        "fallback_to_api": True,
-        "timeout": 120
-    },
-    "deepseek": {
-        "model": "deepseek-reasoner",
-        "base_url": "https://api.deepseek.com",
-        "api_key_env": "DEEPSEEK_API_KEY"
+        "fallback_to_api": False,  # DISABLED - no external API calls
+        "timeout": 180,
+        "require_local": True  # Fail if local LLM unavailable
     },
     "temperature": 0.1,
     "max_tokens": 2000,
