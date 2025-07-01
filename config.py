@@ -102,10 +102,20 @@ SCENE_GRAPH_CONFIG = {
 
 # LLM Configuration
 LLM_CONFIG = {
-    "provider": "deepseek",  # Currently supports: deepseek, openai
-    "model": "deepseek-reasoner",
-    "base_url": "https://api.deepseek.com",
-    "api_key_env": "DEEPSEEK_API_KEY",
+    "provider": "local",  # Options: local, deepseek, openai
+    "local": {
+        "enabled": True,
+        "host": "localhost",
+        "port": 11434,
+        "model": "deepseek-r1:latest",
+        "fallback_to_api": True,
+        "timeout": 120
+    },
+    "deepseek": {
+        "model": "deepseek-reasoner",
+        "base_url": "https://api.deepseek.com",
+        "api_key_env": "DEEPSEEK_API_KEY"
+    },
     "temperature": 0.1,
     "max_tokens": 2000,
     "timeout": 30  # seconds

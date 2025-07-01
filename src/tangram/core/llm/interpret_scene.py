@@ -5,6 +5,44 @@ import json
 import os
 from typing import List, Dict, Any
 
+# Import local LLM client
+try:
+    from .local_llm_client import LocalLLMClient, LocalDeepSeekInterpreter
+    LOCAL_LLM_AVAILABLE = True
+except ImportError:
+    LOCAL_LLM_AVAILABLE = False
+
+from config import LLM_CONFIG
+
+def create_scene_interpreter():
+    """
+    Factory function to create appropriate scene interpreter based on configuration.
+    
+    Returns:
+        Scene interpreter instance (local or API-based)
+    """
+    if LLM_CONFIG.get("provider") == "local" and LOCAL_LLM_AVAILABLE:
+        if LLM_CONFIG["local"]["enabled"]:
+            try:
+                local_config = LLM_CONFIG["local"]
+                llm_client = LocalLLMClient(
+                    model_name=local_config["model"],
+                    ollama_host=local_config["host"],
+                    ollama_port=local_config["port"],
+                    fallback_to_api=local_config["fallback_to_api"]
+                )
+                return LocalDeepSeekInterpreter(llm_client)
+            except Exception as e:
+                print(f"Failed to initialize local LLM, falling back to API: {e}")
+                return DeepSeekSceneInterpreter()
+    
+    # Default to API-based interpreter
+    if LLM_CONFIG.get("provider") == "deepseek":
+        deepseek_config = LLM_CONFIG["deepseek"]
+        return DeepSeekSceneInterpreter(base_url=deepseek_config["base_url"])
+    else:
+        return DeepSeekSceneInterpreter()
+
 class DeepSeekSceneInterpreter:
     def __init__(self, api_key: str = None, base_url: str = "https://api.deepseek.com"):
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")

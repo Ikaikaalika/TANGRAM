@@ -37,7 +37,7 @@ from src.tangram.core.segmenter.run_sam import SAMSegmenter
 from src.tangram.core.reconstruction.triangulate import PointTriangulator
 from src.tangram.core.scene_graph.build_graph import SceneGraphBuilder
 from src.tangram.core.robotics.simulation_env import RoboticsSimulation
-from src.tangram.core.llm.interpret_scene import DeepSeekSceneInterpreter
+from src.tangram.core.llm.interpret_scene import create_scene_interpreter
 from src.tangram.core.visualization.render_graph import GraphVisualizer
 from src.tangram.core.export.results_exporter import ResultsExporter
 
@@ -73,7 +73,7 @@ class TANGRAMPipeline:
         self.segmenter = SAMSegmenter()
         self.triangulator = PointTriangulator()
         self.scene_builder = SceneGraphBuilder()
-        self.llm_interpreter = DeepSeekSceneInterpreter()
+        self.llm_interpreter = create_scene_interpreter()
         self.visualizer = GraphVisualizer()
         self.exporter = ResultsExporter(self.experiment_name)
         
