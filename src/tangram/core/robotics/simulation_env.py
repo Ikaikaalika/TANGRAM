@@ -26,8 +26,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional, Union
 
 from config import PYBULLET_CONFIG, SIMULATION_DIR
-from utils.logging_utils import setup_logger, log_function_call
-from utils.geometry_utils import compute_distance_3d, quaternion_to_rotation_matrix
+from src.tangram.utils.logging_utils import setup_logger, log_function_call
+from src.tangram.utils.geometry_utils import compute_distance_3d, quaternion_to_rotation_matrix
 
 logger = setup_logger(__name__)
 

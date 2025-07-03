@@ -28,9 +28,9 @@ import logging
 from jinja2 import Template
 
 from config import RESULTS_DIR, EXPORTS_DIR, VIDEOS_DIR, LOGS_DIR
-from utils.logging_utils import setup_logger, log_function_call
-from utils.file_utils import save_json, ensure_directory
-from utils.video_utils import extract_video_info
+from src.tangram.utils.logging_utils import setup_logger, log_function_call
+from src.tangram.utils.file_utils import save_json, ensure_directory
+from src.tangram.utils.video_utils import extract_video_info
 
 logger = setup_logger(__name__)
 

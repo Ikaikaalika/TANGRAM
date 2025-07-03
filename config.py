@@ -107,7 +107,7 @@ LLM_CONFIG = {
         "enabled": True,
         "host": "localhost",
         "port": 11434,
-        "model": "deepseek-r1:latest",
+        "model": "deepseek-r1:7b",  # Use 7B for M1 Mac with 8GB RAM
         "fallback_to_api": False,  # DISABLED - no external API calls
         "timeout": 180,
         "require_local": True  # Fail if local LLM unavailable

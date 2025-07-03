@@ -35,7 +35,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import *
-from utils.logging_utils import setup_logger
+from src.tangram.utils.logging_utils import setup_logger
 from tracker.track_objects import YOLOByteTracker
 from segmenter.run_sam import SAMSegmenter
 from scene_graph.build_graph import SceneGraphBuilder
