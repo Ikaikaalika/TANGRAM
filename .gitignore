@@ -19,9 +19,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual Environment
+# Virtual environments
 venv/
 env/
 ENV/
@@ -32,39 +31,9 @@ ENV/
 .idea/
 *.swp
 *.swo
+*~
 
-# Data Files
-data/raw_videos/*.mp4
-data/raw_videos/*.avi
-data/raw_videos/*.mov
-data/sample_videos/*.mp4
-data/frames/
-data/tracking/
-data/masks/
-data/3d_points/
-data/graphs/
-data/simulation/
-
-# Model Checkpoints
-models/
-*.pth
-*.pt
-*.ckpt
-*.safetensors
-
-# Logs
-logs/
-*.log
-
-# Results
-results/
-output/
-exports/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# System
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -73,14 +42,25 @@ exports/
 ehthumbs.db
 Thumbs.db
 
-# COLMAP
-*.db
-sparse/
-dense/
-*.ply
-*.bin
+# Project specific
+data/frames/
+data/3d_points/
+data/graphs/
+data/simulation/
+data/tracking/*.json
+data/masks/*.json
+results/
+output/
+*.mp4
+*.avi
+*.mov
+*.log
+
+# Models (large files)
+models/sam/*.pth
+models/yolo/*.pt
 
 # Temporary files
-tmp/
 temp/
+tmp/
 *.tmp
