@@ -2,6 +2,14 @@
 
 A comprehensive pipeline that transforms video input into actionable robot commands using computer vision, 3D reconstruction, and local AI reasoning.
 
+## 🎥 Demo Videos
+
+### Core Pipeline Demo
+https://github.com/Ikaikaalika/TANGRAM/blob/main/data/raw_videos/TANGRAM_Demo_Video.mp4
+
+### Enhanced Features Demo  
+https://github.com/Ikaikaalika/TANGRAM/blob/main/data/raw_videos/TANGRAM_Enhanced_Demo.mp4
+
 ## Quick Start
 
 ```bash
