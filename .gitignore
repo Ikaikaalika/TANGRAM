@@ -59,6 +59,21 @@ output/
 # Models (large files)
 models/sam/*.pth
 models/yolo/*.pt
+*.pt
+
+# MLX model cache
+~/.cache/mlx/
+.cache/mlx/
+
+# Test data and outputs
+data/3d_reconstruction_live/
+data/3d_reconstruction_test/
+data/frames_live/
+data/frames_test/
+test_colmap_output/
+
+# Demo logs
+tangram_demo.log
 
 # Temporary files
 temp/

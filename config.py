@@ -100,17 +100,23 @@ SCENE_GRAPH_CONFIG = {
     }
 }
 
-# LLM Configuration - LOCAL ONLY (No External APIs)
+# LLM Configuration - Support for multiple backends
 LLM_CONFIG = {
-    "provider": "local",  # MUST be local - no external APIs allowed
+    "provider": "unified",  # unified, local, gemini
+    "prefer_local": True,  # Prefer local over cloud APIs
     "local": {
         "enabled": True,
         "host": "localhost",
         "port": 11434,
         "model": "deepseek-r1:7b",  # Use 7B for M1 Mac with 8GB RAM
-        "fallback_to_api": False,  # DISABLED - no external API calls
         "timeout": 180,
-        "require_local": True  # Fail if local LLM unavailable
+        "require_local": False  # Allow fallback to cloud APIs
+    },
+    "gemini": {
+        "enabled": True,
+        "model": "gemini-1.5-flash",  # gemini-1.5-flash, gemini-1.5-pro
+        "api_key_env": "GOOGLE_API_KEY",  # Environment variable for API key
+        "timeout": 30
     },
     "temperature": 0.1,
     "max_tokens": 2000,
@@ -196,7 +202,9 @@ def get_api_key(service: str) -> str:
     """Get API key for specified service from environment variables."""
     env_keys = {
         "deepseek": "DEEPSEEK_API_KEY",
-        "openai": "OPENAI_API_KEY"
+        "openai": "OPENAI_API_KEY",
+        "gemini": "GOOGLE_API_KEY",
+        "google": "GOOGLE_API_KEY"
     }
     
     key = os.getenv(env_keys.get(service))
