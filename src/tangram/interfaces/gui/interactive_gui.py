@@ -119,9 +119,26 @@ class TangramGUI:
         frame = tk.Frame(parent, bg='#2c3e50')
         parent.add(frame, text="📷 Media Analysis")
         
+        # Top control bar with prominent analyze button
+        control_bar = tk.Frame(frame, bg='#e74c3c', height=80)
+        control_bar.pack(fill=tk.X, padx=10, pady=(10,5))
+        control_bar.pack_propagate(False)
+        
+        tk.Label(control_bar, text="📷 MEDIA ANALYSIS", 
+                font=('Helvetica', 16, 'bold'), fg='white', bg='#e74c3c').pack(side=tk.LEFT, padx=20, pady=20)
+        
+        # Prominent Analyze button at the top
+        self.process_btn = tk.Button(control_bar, text="🔄 ANALYZE MEDIA", 
+                                    font=('Helvetica', 14, 'bold'),
+                                    bg='#95a5a6', fg='#7f8c8d', command=self.process_media,
+                                    padx=30, pady=15, state=tk.DISABLED,
+                                    relief=tk.RAISED, bd=3)
+        self.logger.debug("ANALYZE MEDIA button created in disabled state")
+        self.process_btn.pack(side=tk.RIGHT, padx=20, pady=15)
+        
         # Media display area
         media_frame = tk.Frame(frame, bg='#34495e')
-        media_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        media_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         tk.Label(media_frame, text="Media with Object Detection", 
                 font=('Helvetica', 14, 'bold'), fg='white', bg='#34495e').pack(pady=5)
@@ -129,10 +146,17 @@ class TangramGUI:
         self.media_canvas = tk.Canvas(media_frame, bg='black', width=800, height=600)
         self.media_canvas.pack(pady=10)
         
-        # Media info
-        self.media_info = tk.Label(media_frame, text="No media loaded", 
+        # Media info and button status
+        info_frame = tk.Frame(media_frame, bg='#34495e')
+        info_frame.pack(pady=5)
+        
+        self.media_info = tk.Label(info_frame, text="No media loaded", 
                                   font=('Helvetica', 10), fg='#bdc3c7', bg='#34495e')
-        self.media_info.pack(pady=5)
+        self.media_info.pack()
+        
+        self.button_status = tk.Label(info_frame, text="Button: DISABLED", 
+                                     font=('Helvetica', 9), fg='#e74c3c', bg='#34495e')
+        self.button_status.pack()
         
         # Detection info
         tk.Label(media_frame, text="Detected Objects:", 
@@ -152,13 +176,6 @@ class TangramGUI:
         tips_text = "• People, vehicles, animals\n• Electronics (laptop, phone, TV)\n• Food items (apple, cup, bottle)\n• Furniture (chair, table, bed)\n• Books, bags, everyday objects"
         tk.Label(tips_frame, text=tips_text, 
                 font=('Helvetica', 9), fg='#ecf0f1', bg='#34495e', justify=tk.LEFT).pack(anchor=tk.W, padx=20)
-        
-        # Process button
-        self.process_btn = tk.Button(media_frame, text="🔄 Analyze Media", 
-                                    font=('Helvetica', 12, 'bold'),
-                                    bg='#e74c3c', fg='white', command=self.process_media,
-                                    padx=20, pady=10, state=tk.DISABLED)
-        self.process_btn.pack(pady=10)
     
     def create_3d_tab(self, parent):
         frame = tk.Frame(parent, bg='#2c3e50')
@@ -534,8 +551,16 @@ class TangramGUI:
             self.logger.info(f"User selected media file: {file_path}")
             self.current_media = file_path
             self.determine_media_type()
-            self.process_btn.config(state=tk.NORMAL)
-            self.logger.debug("Process button enabled")
+            
+            # Enable the analyze button with extra logging
+            try:
+                self.process_btn.config(state=tk.NORMAL, bg='#27ae60', fg='white', text='🔄 ANALYZE MEDIA')
+                self.button_status.config(text="Button: ENABLED ✅", fg='#27ae60')
+                self.logger.info("✅ ANALYZE MEDIA button enabled and styled")
+                print("✅ ANALYZE MEDIA button is now ENABLED!")
+            except Exception as e:
+                self.logger.error(f"❌ Failed to enable button: {e}")
+            
             self.display_media_frame()
             print(f"📁 Media loaded: {Path(file_path).name}")
         else:
