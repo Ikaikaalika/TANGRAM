@@ -29,13 +29,21 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.tangram.pipeline.planning.llm.local_llm_client import LocalLLMClient
+from src.tangram.utils.logging_utils import setup_logger, log_function_call
 
 class TangramGUI:
     def __init__(self):
+        # Set up logging first
+        self.logger = setup_logger(__name__, "tangram_gui.log")
+        self.logger.info("=" * 60)
+        self.logger.info("TANGRAM GUI INITIALIZATION STARTED")
+        self.logger.info("=" * 60)
+        
         self.root = tk.Tk()
         self.root.title("TANGRAM Interactive - Video to 3D Robot Control")
         self.root.geometry("1400x900")
         self.root.configure(bg='#2c3e50')
+        self.logger.debug("Main window configured")
         
         # State
         self.current_media = None
@@ -43,6 +51,7 @@ class TangramGUI:
         self.scene_objects = []
         self.robot_pos = {'x': 0, 'y': 3, 'z': 1.5}
         self.llm_client = None
+        self.logger.debug("GUI state variables initialized")
         
         # Camera state
         self.camera = None
@@ -50,15 +59,21 @@ class TangramGUI:
         self.is_recording = False
         self.camera_thread = None
         self.recorded_frames = []
+        self.logger.debug("Camera state variables initialized")
         
         # Initialize LLM
+        self.logger.info("Initializing LLM client...")
         try:
             self.llm_client = LocalLLMClient()
+            self.logger.info("✅ LLM client initialized successfully")
             print("✅ LLM Ready")
-        except:
+        except Exception as e:
+            self.logger.error(f"❌ LLM client initialization failed: {e}")
             print("❌ LLM Failed")
         
+        self.logger.info("Creating GUI components...")
         self.create_gui()
+        self.logger.info("✅ TANGRAM GUI initialization completed successfully")
     
     def create_gui(self):
         # Header
@@ -85,19 +100,19 @@ class TangramGUI:
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # Tab 1: Media & Detection
+        # Tab 1: Media Analysis
         self.create_media_tab(notebook)
         
-        # Tab 2: 3D Environment
-        self.create_3d_tab(notebook)
-        
-        # Tab 3: Environment Creation
+        # Tab 2: Environment Creation
         self.create_environment_tab(notebook)
+        
+        # Tab 3: 3D Environment
+        self.create_3d_tab(notebook)
         
         # Tab 4: Scene Graph
         self.create_scene_graph_tab(notebook)
         
-        # Tab 5: LLM Control
+        # Tab 5: Robot Control
         self.create_llm_tab(notebook)
     
     def create_media_tab(self, parent):
@@ -123,9 +138,20 @@ class TangramGUI:
         tk.Label(media_frame, text="Detected Objects:", 
                 font=('Helvetica', 12, 'bold'), fg='white', bg='#34495e').pack(pady=(20,5))
         
-        self.detection_text = scrolledtext.ScrolledText(media_frame, height=10, 
+        self.detection_text = scrolledtext.ScrolledText(media_frame, height=8, 
                                                        font=('Courier', 10))
         self.detection_text.pack(fill=tk.X, padx=20, pady=5)
+        
+        # Add detection tips
+        tips_frame = tk.Frame(media_frame, bg='#34495e')
+        tips_frame.pack(fill=tk.X, padx=20, pady=5)
+        
+        tk.Label(tips_frame, text="💡 For best detection results, use photos with:", 
+                font=('Helvetica', 10, 'bold'), fg='#f39c12', bg='#34495e').pack(anchor=tk.W)
+        
+        tips_text = "• People, vehicles, animals\n• Electronics (laptop, phone, TV)\n• Food items (apple, cup, bottle)\n• Furniture (chair, table, bed)\n• Books, bags, everyday objects"
+        tk.Label(tips_frame, text=tips_text, 
+                font=('Helvetica', 9), fg='#ecf0f1', bg='#34495e', justify=tk.LEFT).pack(anchor=tk.W, padx=20)
         
         # Process button
         self.process_btn = tk.Button(media_frame, text="🔄 Analyze Media", 
@@ -136,7 +162,7 @@ class TangramGUI:
     
     def create_3d_tab(self, parent):
         frame = tk.Frame(parent, bg='#2c3e50')
-        parent.add(frame, text="🏗️ 3D Environment")
+        parent.add(frame, text="🌍 3D Environment")
         
         # 3D visualization
         self.fig = plt.figure(figsize=(12, 8), facecolor='#2c3e50')
@@ -171,7 +197,7 @@ class TangramGUI:
         right_panel.pack_propagate(False)
         
         # Environment creation visualization (left)
-        tk.Label(left_panel, text="Environment Creation Process", 
+        tk.Label(left_panel, text="3D Environment Creation Process", 
                 font=('Helvetica', 14, 'bold'), fg='white', bg='#34495e').pack(pady=5)
         
         # Canvas for step-by-step visualization
@@ -198,7 +224,7 @@ class TangramGUI:
         control_frame = tk.Frame(right_panel, bg='#34495e')
         control_frame.pack(fill=tk.X, pady=10)
         
-        self.start_env_btn = tk.Button(control_frame, text="▶️ Start Creation", 
+        self.start_env_btn = tk.Button(control_frame, text="▶️ Build 3D Scene", 
                                       font=('Helvetica', 11, 'bold'),
                                       bg='#27ae60', fg='white', 
                                       command=self.start_environment_creation)
@@ -241,7 +267,7 @@ class TangramGUI:
         
         self.env_status_labels = {}
         creation_steps = [
-            ('frame_extraction', 'Frame Extraction'),
+            ('frame_extraction', 'Media Processing'),
             ('object_detection', 'Object Detection'),
             ('depth_estimation', 'Depth Estimation'),
             ('3d_reconstruction', '3D Reconstruction'),
@@ -491,7 +517,9 @@ class TangramGUI:
                                                    bg='#2c3e50', fg='#00ff00')
         self.action_log.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
     
+    @log_function_call()
     def upload_media(self):
+        self.logger.info("Opening media upload dialog")
         file_path = filedialog.askopenfilename(
             title="Select Media File",
             filetypes=[
@@ -503,11 +531,15 @@ class TangramGUI:
         )
         
         if file_path:
+            self.logger.info(f"User selected media file: {file_path}")
             self.current_media = file_path
             self.determine_media_type()
             self.process_btn.config(state=tk.NORMAL)
+            self.logger.debug("Process button enabled")
             self.display_media_frame()
             print(f"📁 Media loaded: {Path(file_path).name}")
+        else:
+            self.logger.info("User cancelled media selection")
     
     def determine_media_type(self):
         if not self.current_media:
@@ -573,67 +605,99 @@ class TangramGUI:
                 # Update info
                 self.media_info.config(text=f"Image: {w}x{h} pixels")
     
+    @log_function_call()
     def process_media(self):
         if not self.current_media:
+            self.logger.warning("Process media called but no media loaded")
             return
         
+        self.logger.info(f"Starting media processing for: {self.current_media}")
+        self.logger.debug(f"Media type: {self.media_type}")
         self.process_btn.config(text="Processing...", state=tk.DISABLED)
         
         # Run in background
+        self.logger.debug("Starting background processing thread")
         thread = threading.Thread(target=self._process_media_bg)
         thread.daemon = True
         thread.start()
     
     def _process_media_bg(self):
         try:
-            # Import TANGRAM pipeline
-            from main import TANGRAMPipeline
+            self.logger.info("Starting background media processing")
             
-            pipeline = TANGRAMPipeline(self.current_media, "temp")
+            # Use direct YOLO detection instead of full pipeline to avoid LLM issues
+            from src.tangram.pipeline.perception.tracker.track_objects import YOLOByteTracker
             
-            if self.media_type == 'video':
-                results = pipeline.run_tracking()
+            tracker = YOLOByteTracker()
+            
+            # Process media directly
+            results = tracker.process_media(self.current_media, "data/tracking")
+            self.logger.info(f"Detection completed, found {len(results)} frames")
+            
+            if results and len(results) > 0:
+                # Extract detections from first frame
+                detections = results[0].get('detections', [])
+                self.logger.info(f"Found {len(detections)} objects in media")
+                
+                # Store results and update GUI
+                self.scene_objects = detections
+                self.root.after(0, self._processing_done)
             else:
-                # For images, run object detection directly
-                results = pipeline.run_tracking()  # This will work for single images too
-            
-            if results:
+                self.logger.warning("No detection results returned")
+                self.scene_objects = []
                 self.root.after(0, self._processing_done)
             
         except Exception as e:
+            self.logger.error(f"Media processing failed: {e}")
             print(f"❌ Processing error: {e}")
             self.root.after(0, lambda: self.process_btn.config(text="🔄 Analyze Media", state=tk.NORMAL))
     
     def _processing_done(self):
+        self.logger.info("Processing completed, updating GUI")
         self.process_btn.config(text="✅ Analysis Complete", state=tk.NORMAL)
         
-        # Load results
-        try:
-            with open("data/tracking/tracking_results.json") as f:
-                results = json.load(f)
+        # Update displays with stored results
+        if hasattr(self, 'scene_objects') and self.scene_objects:
+            detections = self.scene_objects
+            self.logger.info(f"Updating GUI with {len(detections)} detected objects")
             
-            if results and len(results) > 0:
-                detections = results[0].get('detections', [])
-                self.scene_objects = detections
-                
-                # Update displays
-                self.update_detection_display(detections)
-                self.display_detection_overlay()
-                self.update_3d_scene()
-                
-                self.log_action(f"✅ Detected {len(detections)} objects")
-        
-        except Exception as e:
-            print(f"❌ Results loading error: {e}")
+            # Update displays
+            self.update_detection_display(detections)
+            self.display_detection_overlay()
+            self.update_3d_scene()
+            
+            self.log_action(f"✅ Detected {len(detections)} objects")
+        else:
+            self.logger.info("No objects detected, updating GUI accordingly")
+            self.scene_objects = []
+            self.update_detection_display([])
+            self.log_action("No objects detected")
     
     def update_detection_display(self, detections):
         self.detection_text.delete(1.0, tk.END)
-        self.detection_text.insert(tk.END, f"Detected {len(detections)} objects:\\n\\n")
+        
+        if not detections:
+            self.detection_text.insert(tk.END, "❌ No objects detected\\n\\n")
+            self.detection_text.insert(tk.END, "Possible reasons:\\n")
+            self.detection_text.insert(tk.END, "• Image contains no recognizable objects\\n")
+            self.detection_text.insert(tk.END, "• Objects too small or unclear\\n") 
+            self.detection_text.insert(tk.END, "• Confidence below 30% threshold\\n")
+            self.detection_text.insert(tk.END, "• Try photos with common objects listed above\\n")
+            self.logger.info("No objects detected in current media")
+            return
+        
+        self.detection_text.insert(tk.END, f"✅ Detected {len(detections)} objects:\\n\\n")
         
         for i, det in enumerate(detections):
+            confidence = det.get('confidence', 0)
+            bbox = det.get('bbox', [0, 0, 0, 0])
             self.detection_text.insert(tk.END, 
-                f"Object {i+1}: {det.get('class_name', 'unknown')} "
-                f"(confidence: {det.get('confidence', 0):.2f})\\n")
+                f"Object {i+1}: {det.get('class_name', 'unknown')}\\n"
+                f"  Confidence: {confidence:.1%} ({confidence:.3f})\\n"
+                f"  Position: x={bbox[0]:.0f}, y={bbox[1]:.0f}\\n"
+                f"  Size: {bbox[2]:.0f}×{bbox[3]:.0f}px\\n\\n")
+            
+            self.logger.debug(f"Detected {det.get('class_name')}: confidence={confidence:.3f}, bbox={bbox}")
     
     def display_detection_overlay(self):
         """Display media with detection overlays"""
@@ -644,9 +708,12 @@ class TangramGUI:
         # For now, just redisplay the original media
         self.display_media_frame()
     
+    @log_function_call()
     def open_camera(self):
         """Open camera window for capturing video or photos"""
+        self.logger.info("Opening camera window")
         if self.camera_window is not None:
+            self.logger.debug("Camera window already open, bringing to front")
             self.camera_window.lift()
             return
         
@@ -1171,7 +1238,8 @@ class TangramGUI:
             return
         
         self.env_creation_active = True
-        self.log_action("Starting environment creation process")
+        media_type = getattr(self, 'media_type', 'media')
+        self.log_action(f"Starting 3D environment creation from {media_type}")
         
         # Update button states
         self.start_env_btn.config(state='disabled')
@@ -1186,7 +1254,7 @@ class TangramGUI:
     def pause_environment_creation(self):
         """Pause the environment creation process"""
         self.env_creation_active = False
-        self.log_action("Environment creation paused")
+        self.log_action("3D environment creation paused")
         
         # Update button states
         self.start_env_btn.config(state='normal')
@@ -1195,7 +1263,7 @@ class TangramGUI:
     def reset_environment_creation(self):
         """Reset the environment creation process"""
         self.env_creation_active = False
-        self.log_action("Environment creation reset")
+        self.log_action("3D environment creation reset")
         
         # Reset progress bars
         self.overall_progress['value'] = 0
@@ -1215,13 +1283,25 @@ class TangramGUI:
     
     def _environment_creation_process(self):
         """Background environment creation process"""
-        steps = [
-            ("frame_extraction", "Extracting frames from video"),
-            ("object_detection", "Running object detection"),
-            ("depth_estimation", "Estimating depth information"),
-            ("3d_reconstruction", "Reconstructing 3D scene"),
-            ("scene_mapping", "Building scene graph")
-        ]
+        # Determine media type for appropriate step descriptions
+        is_video = self.media_type == 'video' if hasattr(self, 'media_type') else True
+        
+        if is_video:
+            steps = [
+                ("frame_extraction", "Extracting frames from video"),
+                ("object_detection", "Running object detection"),
+                ("depth_estimation", "Estimating depth information"),
+                ("3d_reconstruction", "Reconstructing 3D scene"),
+                ("scene_mapping", "Building scene graph")
+            ]
+        else:
+            steps = [
+                ("frame_extraction", "Loading image data"),
+                ("object_detection", "Running object detection"),
+                ("depth_estimation", "Estimating depth information"),
+                ("3d_reconstruction", "Creating 3D scene layout"),
+                ("scene_mapping", "Building scene graph")
+            ]
         
         total_steps = len(steps)
         
@@ -1260,7 +1340,7 @@ class TangramGUI:
         if self.env_creation_active:
             self.root.after(0, lambda: self.overall_progress.config(value=100))
             self.root.after(0, lambda: self.step_progress.config(value=100))
-            self.root.after(0, lambda: self.log_action("Environment creation completed successfully"))
+            self.root.after(0, lambda: self.log_action("3D environment creation completed successfully"))
         
         self.env_creation_active = False
     

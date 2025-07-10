@@ -161,10 +161,12 @@ VISUALIZATION_CONFIG = {
 
 # Logging Configuration
 LOGGING_CONFIG = {
-    "level": "INFO",  # DEBUG, INFO, WARNING, ERROR
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "level": "DEBUG",  # DEBUG for detailed debugging information
+    "format": "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
     "file_rotation": "daily",
-    "max_log_files": 7
+    "max_log_files": 7,
+    "console_level": "INFO",  # Less verbose on console
+    "file_level": "DEBUG"     # Full debug info in files
 }
 
 # Hardware Configuration

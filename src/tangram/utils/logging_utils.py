@@ -13,11 +13,11 @@ from config import LOGS_DIR, LOGGING_CONFIG
 
 def setup_logger(name: str, log_file: str = None) -> logging.Logger:
     """
-    Set up a logger with consistent formatting.
+    Set up a logger with consistent formatting and enhanced debugging.
     
     Args:
         name: Logger name (usually __name__)
-        log_file: Optional log file path. If None, uses console only.
+        log_file: Optional log file path. If None, auto-generates from module name.
         
     Returns:
         Configured logger instance
@@ -28,24 +28,36 @@ def setup_logger(name: str, log_file: str = None) -> logging.Logger:
     if logger.handlers:
         return logger
         
-    logger.setLevel(getattr(logging, LOGGING_CONFIG["level"]))
+    logger.setLevel(logging.DEBUG)  # Always capture all levels
     
-    # Create formatter
-    formatter = logging.Formatter(LOGGING_CONFIG["format"])
+    # Create formatters
+    detailed_formatter = logging.Formatter(LOGGING_CONFIG["format"])
+    simple_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     
-    # Console handler
+    # Console handler (less verbose)
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(simple_formatter)
+    console_level = LOGGING_CONFIG.get("console_level", "INFO")
+    console_handler.setLevel(getattr(logging, console_level))
     logger.addHandler(console_handler)
     
-    # File handler (if specified)
-    if log_file:
-        log_path = LOGS_DIR / log_file
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    # File handler (detailed logging)
+    if log_file is None:
+        # Auto-generate log file name from module
+        module_name = name.split(".")[-1] if "." in name else name
+        log_file = f"{module_name}.log"
+    
+    log_path = LOGS_DIR / log_file
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(detailed_formatter)
+    file_level = LOGGING_CONFIG.get("file_level", "DEBUG")
+    file_handler.setLevel(getattr(logging, file_level))
+    logger.addHandler(file_handler)
+    
+    # Log the logger setup
+    logger.debug(f"Logger '{name}' initialized with console level {console_level} and file level {file_level}")
     
     return logger
 
