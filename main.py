@@ -34,14 +34,14 @@ from config import (
 )
 from src.tangram.utils.logging_utils import setup_logger, log_pipeline_step
 from src.tangram.utils.mock_data import create_mock_3d_positions
-from src.tangram.core.tracker.track_objects import YOLOByteTracker
-from src.tangram.core.segmenter.run_sam import SAMSegmenter
-from src.tangram.core.reconstruction.triangulate import PointTriangulator
-from src.tangram.core.scene_graph.build_graph import SceneGraphBuilder
-from src.tangram.core.robotics.simulation_env import RoboticsSimulation
-from src.tangram.core.llm.interpret_scene import create_scene_interpreter
-from src.tangram.core.visualization.render_graph import GraphVisualizer
-from src.tangram.core.export.results_exporter import ResultsExporter
+from src.tangram.pipeline.perception.tracker.track_objects import YOLOByteTracker
+from src.tangram.pipeline.perception.segmenter.run_sam import SAMSegmenter
+from src.tangram.pipeline.understanding.reconstruction.triangulate import PointTriangulator
+from src.tangram.pipeline.understanding.scene_graph.build_graph import SceneGraphBuilder
+from src.tangram.pipeline.execution.robotics.simulation_env import RoboticsSimulation
+from src.tangram.pipeline.planning.llm.interpret_scene import create_scene_interpreter
+from src.tangram.interfaces.gui.render_graph import GraphVisualizer
+from src.tangram.utils.export.results_exporter import ResultsExporter
 
 logger = setup_logger(__name__)
 
@@ -84,15 +84,21 @@ class TANGRAMPipeline:
     
     @log_pipeline_step("Object Detection and Tracking")
     def run_tracking(self):
-        """Run object detection and tracking."""
-        logger.info("Starting object tracking...")
+        """Run object detection and tracking for images or videos."""
+        logger.info("Starting object detection/tracking...")
         
-        tracking_results = self.tracker.process_video(
+        # Use the new auto-detection method that handles both images and videos
+        tracking_results = self.tracker.process_media(
             str(self.input_path),
             output_dir=str(TRACKING_DIR)
         )
         
-        logger.info(f"Tracking completed: {len(tracking_results)} frames processed")
+        if not tracking_results:
+            logger.error("No detection results produced")
+            return None
+        
+        file_type = "image" if len(tracking_results) == 1 else "video"
+        logger.info(f"Detection completed: {len(tracking_results)} frame(s) processed ({file_type})")
         return tracking_results
     
     @log_pipeline_step("Object Segmentation")
@@ -124,21 +130,41 @@ class TANGRAMPipeline:
         """Run 3D reconstruction pipeline."""
         logger.info("Starting 3D reconstruction...")
         
-        # Extract frames
-        from reconstruction.extract_frames import extract_frames
-        success = extract_frames(
-            str(self.input_path),
-            str(FRAMES_DIR),
-            frame_interval=5,
-            max_frames=100
-        )
+        # Check if input is image or video
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
+        is_image = self.input_path.suffix.lower() in image_extensions
+        
+        if is_image:
+            # For single images, copy the image to frames directory
+            import shutil
+            FRAMES_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(self.input_path, FRAMES_DIR / f"frame_0001{self.input_path.suffix}")
+            logger.info("Single image copied to frames directory")
+            success = True
+        else:
+            # Extract frames from video
+            try:
+                from reconstruction.extract_frames import extract_frames
+                success = extract_frames(
+                    str(self.input_path),
+                    str(FRAMES_DIR),
+                    frame_interval=5,
+                    max_frames=100
+                )
+            except ImportError:
+                logger.warning("Frame extraction module not found, using mock extraction")
+                success = True
         
         if not success:
             logger.error("Frame extraction failed")
             return None
         
         # Run COLMAP (would need to be implemented)
-        logger.info("Note: COLMAP reconstruction should be run separately")
+        if is_image:
+            logger.info("Single image detected - generating simplified 3D positions")
+        else:
+            logger.info("Note: COLMAP reconstruction should be run separately for videos")
+        
         logger.info("Using mock 3D positions for pipeline demonstration")
         
         # For now, create mock positions
@@ -146,6 +172,7 @@ class TANGRAMPipeline:
         
         # Save to expected location
         import json
+        RECONSTRUCTION_DIR.mkdir(parents=True, exist_ok=True)
         with open(RECONSTRUCTION_DIR / "object_3d_positions.json", 'w') as f:
             json.dump(mock_positions, f, indent=2)
         
@@ -294,15 +321,35 @@ class TANGRAMPipeline:
 def main():
     """Main entry point for TANGRAM pipeline."""
     parser = argparse.ArgumentParser(description="TANGRAM Robotic Scene Understanding Pipeline")
-    parser.add_argument("--input", "-i", required=True, help="Input video file")
+    parser.add_argument("--input", "-i", help="Input video file")
     parser.add_argument("--output", "-o", default="output", help="Output directory")
-    parser.add_argument("--mode", choices=["track", "segment", "reconstruct", "graph", "llm", "simulate", "full"], 
-                       default="full", help="Processing mode")
+    parser.add_argument("--mode", choices=["track", "segment", "reconstruct", "graph", "llm", "simulate", "full", "gui"], 
+                       default="gui", help="Processing mode")
     parser.add_argument("--gui", action="store_true", help="Show GUI for simulation")
     parser.add_argument("--goal", default="Clear the table", help="Goal for LLM task planning")
     parser.add_argument("--name", help="Experiment name")
+    parser.add_argument("--no-gui", action="store_true", help="Force command line mode")
     
     args = parser.parse_args()
+    
+    # Launch interactive GUI by default unless --no-gui is specified
+    if not args.no_gui and (args.mode == "gui" or not args.input):
+        print("🚀 Launching TANGRAM Interactive GUI...")
+        try:
+            from src.tangram.interfaces.gui.interactive_gui import TangramGUI
+            app = TangramGUI()
+            app.run()
+            return 0
+        except Exception as e:
+            print(f"❌ GUI launch failed: {e}")
+            print("💡 Use --no-gui to run in command line mode")
+            return 1
+    
+    # Command line mode - require input file
+    if not args.input:
+        print("Error: --input is required for command line mode")
+        print("💡 Run without --no-gui to use the interactive GUI")
+        return 1
     
     # Check input file
     if not Path(args.input).exists():

@@ -38,12 +38,14 @@ LOGS_DIR = RESULTS_DIR / "logs"
 
 # YOLO Configuration
 YOLO_CONFIG = {
-    "model_name": "yolov8n.pt",  # Use nano model for faster inference on M1
-    "confidence_threshold": 0.5,
+    "model_name": "yolov8x.pt",  # Use extra-large model for best accuracy
+    "model_fallbacks": ["yolov8l.pt", "yolov8m.pt", "yolov8s.pt", "yolov8n.pt"],  # Fallback models
+    "confidence_threshold": 0.3,  # Lower threshold for better detection
     "iou_threshold": 0.7,
-    "max_detections": 50,
+    "max_detections": 100,  # More detections for photos
     "device": "mps",  # Apple Silicon GPU acceleration
-    "tracker_config": "bytetrack.yaml"
+    "tracker_config": "bytetrack.yaml",
+    "imgsz": 1280  # Higher resolution for better photo detection
 }
 
 # SAM Configuration
