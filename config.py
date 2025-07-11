@@ -14,16 +14,37 @@ from pathlib import Path
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.absolute()
 
-# Data directories
+# Data directories - New logical structure
 DATA_DIR = PROJECT_ROOT / "data"
-RAW_VIDEOS_DIR = DATA_DIR / "raw_videos"
-SAMPLE_VIDEOS_DIR = DATA_DIR / "sample_videos"
-FRAMES_DIR = DATA_DIR / "frames"
-TRACKING_DIR = DATA_DIR / "tracking"
-MASKS_DIR = DATA_DIR / "masks"
-RECONSTRUCTION_DIR = DATA_DIR / "3d_points"
-GRAPHS_DIR = DATA_DIR / "graphs"
-SIMULATION_DIR = DATA_DIR / "simulation"
+
+# Input directories
+INPUTS_DIR = DATA_DIR / "inputs"
+MEDIA_DIR = INPUTS_DIR / "media"  # Formerly raw_videos
+SAMPLES_DIR = INPUTS_DIR / "samples"  # Formerly sample_videos
+DEMOS_DIR = INPUTS_DIR / "demos"
+
+# Processing directories
+PROCESSING_DIR = DATA_DIR / "processing"
+FRAMES_DIR = PROCESSING_DIR / "frames"
+TRACKING_DIR = PROCESSING_DIR / "tracking"
+MASKS_DIR = PROCESSING_DIR / "segmentation"  # Formerly masks
+COLMAP_DIR = PROCESSING_DIR / "colmap_reconstruction"  # Formerly 3d_reconstruction_*
+
+# Output directories
+OUTPUTS_DIR = DATA_DIR / "outputs"
+RECONSTRUCTION_DIR = OUTPUTS_DIR / "point_clouds"  # Formerly 3d_points
+GRAPHS_DIR = OUTPUTS_DIR / "scene_graphs"  # Formerly graphs
+SIMULATION_DIR = OUTPUTS_DIR / "simulation_results"  # Formerly simulation
+EXPORTS_DIR = OUTPUTS_DIR / "exports"
+
+# Cache directories
+CACHE_DIR = DATA_DIR / "cache"
+TEMP_DIR = CACHE_DIR / "temp"
+SESSIONS_DIR = CACHE_DIR / "sessions"
+
+# Backward compatibility aliases
+RAW_VIDEOS_DIR = MEDIA_DIR
+SAMPLE_VIDEOS_DIR = SAMPLES_DIR
 
 # Model directories
 MODELS_DIR = PROJECT_ROOT / "models"
@@ -36,16 +57,18 @@ EXPORTS_DIR = RESULTS_DIR / "exports"
 VIDEOS_DIR = RESULTS_DIR / "videos"
 LOGS_DIR = RESULTS_DIR / "logs"
 
-# YOLO Configuration
+# YOLO Configuration - Updated to YOLOv11
 YOLO_CONFIG = {
-    "model_name": "yolov8x.pt",  # Use extra-large model for best accuracy
-    "model_fallbacks": ["yolov8l.pt", "yolov8m.pt", "yolov8s.pt", "yolov8n.pt"],  # Fallback models
-    "confidence_threshold": 0.3,  # Lower threshold for better detection
+    "model_name": "yolo11x.pt",  # YOLOv11 extra-large - latest and most accurate
+    "model_fallbacks": ["yolo11l.pt", "yolo11m.pt", "yolo11s.pt", "yolo11n.pt", "yolov8x.pt"],  # Fallback models
+    "confidence_threshold": 0.25,  # Optimized for YOLOv11's improved accuracy
     "iou_threshold": 0.7,
     "max_detections": 100,  # More detections for photos
     "device": "mps",  # Apple Silicon GPU acceleration
     "tracker_config": "bytetrack.yaml",
-    "imgsz": 1280  # Higher resolution for better photo detection
+    "imgsz": 1280,  # Higher resolution for better photo detection
+    "agnostic_nms": True,  # YOLOv11 feature for better multi-class detection
+    "half": True  # Use FP16 for faster inference on Apple Silicon
 }
 
 # SAM Configuration
@@ -56,10 +79,10 @@ SAM_CONFIG = {
         "vit_l": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
         "vit_h": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"
     },
-    "device": "mps",  # Apple Silicon GPU acceleration
-    "points_per_side": 32,  # For automatic mask generation
-    "pred_iou_thresh": 0.88,
-    "stability_score_thresh": 0.95
+    "device": "cpu",  # Use CPU for stability (SAM has MPS issues on Apple Silicon)
+    "points_per_side": 16,  # Reduced for memory efficiency
+    "pred_iou_thresh": 0.86,
+    "stability_score_thresh": 0.92
 }
 
 # COLMAP Configuration
@@ -104,22 +127,40 @@ SCENE_GRAPH_CONFIG = {
 
 # LLM Configuration - Support for multiple backends
 LLM_CONFIG = {
-    "provider": "unified",  # unified, local, gemini
-    "prefer_local": True,  # Prefer local over cloud APIs
-    "local": {
+    "provider": "auto",  # auto, huggingface, ollama, gemini
+    "prompt_for_api_key": True,  # Ask for API key at start if needed
+    "prefer_local": False,  # Prefer cloud APIs for faster startup
+    
+    # Hugging Face (preferred local option)
+    "huggingface": {
+        "enabled": True,
+        "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",  # DeepSeek R1 7B
+        "device": "mps",  # Apple Silicon GPU acceleration
+        "torch_dtype": "float16",
+        "max_new_tokens": 2000,
+        "temperature": 0.1,
+        "do_sample": True,
+        "timeout": 180
+    },
+    
+    # Ollama (fallback local option)
+    "ollama": {
         "enabled": True,
         "host": "localhost",
         "port": 11434,
         "model": "deepseek-r1:7b",  # Use 7B for M1 Mac with 8GB RAM
-        "timeout": 180,
-        "require_local": False  # Allow fallback to cloud APIs
+        "timeout": 180
     },
+    
+    # Google Gemini API (cloud fallback)
     "gemini": {
         "enabled": True,
         "model": "gemini-1.5-flash",  # gemini-1.5-flash, gemini-1.5-pro
         "api_key_env": "GOOGLE_API_KEY",  # Environment variable for API key
         "timeout": 30
     },
+    
+    # Global settings
     "temperature": 0.1,
     "max_tokens": 2000,
     "timeout": 30  # seconds

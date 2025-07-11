@@ -47,8 +47,8 @@ class ReconstructionPipeline:
             colmap_output_dir: Directory for COLMAP output
             skip_dense: Skip dense reconstruction (faster, uses less memory)
         """
-        self.frames_dir = frames_dir or str(PROJECT_ROOT / "data" / "frames")
-        self.colmap_output_dir = colmap_output_dir or str(PROJECT_ROOT / "data" / "3d_points")
+        self.frames_dir = frames_dir or str(PROJECT_ROOT / "data" / "processing" / "frames")
+        self.colmap_output_dir = colmap_output_dir or str(PROJECT_ROOT / "data" / "outputs" / "point_clouds")
         self.skip_dense = skip_dense
         
         # Create directories
@@ -420,7 +420,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="TANGRAM 3D Reconstruction Pipeline")
     parser.add_argument("--video", "-v", required=True, help="Input video path")
-    parser.add_argument("--output", "-o", default="data/3d_points", help="Output directory")
+    parser.add_argument("--output", "-o", default="data/outputs/point_clouds", help="Output directory")
     parser.add_argument("--force", "-f", action="store_true", help="Force recomputation")
     parser.add_argument("--dense", action="store_true", help="Enable dense reconstruction")
     

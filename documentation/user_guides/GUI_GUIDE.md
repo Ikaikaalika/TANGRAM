@@ -229,7 +229,7 @@ pip install -r requirements.txt
 **Video Loading Problems**:
 - Supported formats: MP4, AVI, MOV, MKV, FLV
 - Check file permissions
-- Try sample videos in `data/sample_videos/`
+- Try sample videos in `data/inputs/samples/`
 
 **Pipeline Errors**:
 - Check Logs tab for detailed error information

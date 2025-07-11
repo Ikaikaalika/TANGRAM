@@ -16,46 +16,154 @@ from config import LLM_CONFIG
 
 def create_scene_interpreter():
     """
-    Factory function to create LOCAL ONLY scene interpreter.
-    NO EXTERNAL API CALLS ALLOWED.
+    Factory function to create scene interpreter with unified LLM support.
+    
+    Supports multiple backends: Hugging Face, Ollama, and Google Gemini.
+    Automatically selects the best available option.
     
     Returns:
-        Local scene interpreter instance
+        Scene interpreter instance with unified LLM backend
         
     Raises:
-        RuntimeError: If local LLM is not available and required
+        RuntimeError: If no LLM backend is available
     """
-    if LLM_CONFIG.get("provider") != "local":
-        raise RuntimeError("LLM provider must be 'local' - no external APIs allowed")
-    
-    if not LOCAL_LLM_AVAILABLE:
-        raise RuntimeError("Local LLM client not available - cannot import local_llm_client module")
-    
-    local_config = LLM_CONFIG["local"]
-    if not local_config["enabled"]:
-        raise RuntimeError("Local LLM is disabled in configuration")
-    
     try:
-        llm_client = LocalLLMClient(
-            model_name=local_config["model"],
-            ollama_host=local_config["host"],
-            ollama_port=local_config["port"],
-            fallback_to_api=False  # NEVER fallback to API
-        )
+        # Import the unified LLM client
+        from .unified_llm_client import UnifiedLLMClient
         
-        if local_config.get("require_local", True) and not llm_client.is_available:
-            raise RuntimeError(
-                f"Local LLM required but not available. "
-                f"Please run setup script: docs/scripts/setup_deepseek_thunder.sh"
-            )
+        # Create unified client (will auto-select best backend)
+        llm_client = UnifiedLLMClient()
         
-        return LocalDeepSeekInterpreter(llm_client)
+        # Create scene interpreter with unified client
+        return UnifiedSceneInterpreter(llm_client)
         
     except Exception as e:
-        if local_config.get("require_local", True):
-            raise RuntimeError(f"Failed to initialize required local LLM: {e}")
-        else:
-            raise
+        raise RuntimeError(f"Failed to initialize LLM backend: {e}")
+
+
+class UnifiedSceneInterpreter:
+    """
+    Scene interpreter that works with the unified LLM client.
+    Supports multiple backends through the unified client.
+    """
+    
+    def __init__(self, llm_client):
+        self.llm_client = llm_client
+        self.system_prompt = """You are TANGRAM, an AI assistant for robotic scene understanding and task planning.
+
+Your role is to analyze 3D scenes and provide actionable insights for robot manipulation tasks.
+
+Key capabilities:
+- Interpret object relationships and spatial arrangements
+- Generate step-by-step task plans for robotic manipulation
+- Understand scene context and object affordances
+- Provide clear, executable instructions
+
+Always be concise, practical, and focused on actionable robot tasks."""
+    
+    def interpret_scene(self, scene_data: Dict[str, Any], goal: str = None) -> Dict[str, Any]:
+        """
+        Interpret scene data and generate task plan.
+        
+        Args:
+            scene_data: Scene graph and object information
+            goal: Optional goal description
+            
+        Returns:
+            Interpretation results including task sequence
+        """
+        try:
+            # Build comprehensive prompt
+            prompt = self._build_scene_prompt(scene_data, goal)
+            
+            # Generate response using unified client
+            response = self.llm_client.generate_response(prompt)
+            
+            # Parse response into structured format
+            interpretation = self._parse_response(response)
+            
+            return interpretation
+            
+        except Exception as e:
+            return {
+                "error": str(e),
+                "scene_description": "Failed to interpret scene",
+                "task_sequence": [],
+                "confidence": 0.0
+            }
+    
+    def _build_scene_prompt(self, scene_data: Dict[str, Any], goal: str = None) -> str:
+        """Build comprehensive scene analysis prompt"""
+        prompt = f"{self.system_prompt}\n\n"
+        
+        # Add scene data
+        prompt += "SCENE DATA:\n"
+        if "nodes" in scene_data:
+            prompt += "Objects detected:\n"
+            for node_id, node_data in scene_data["nodes"].items():
+                prompt += f"- {node_id}: {node_data}\n"
+        
+        if "edges" in scene_data:
+            prompt += "\nSpatial relationships:\n"
+            for edge in scene_data["edges"]:
+                if len(edge) >= 3:
+                    prompt += f"- {edge[0]} {edge[2]} {edge[1]}\n"
+        
+        # Add goal if provided
+        if goal:
+            prompt += f"\nGOAL: {goal}\n"
+        
+        prompt += """
+TASK: Analyze this scene and provide:
+1. Scene description (2-3 sentences)
+2. Key objects and their relationships
+3. Step-by-step task plan to achieve the goal
+4. Confidence score (0-1)
+
+Respond in JSON format:
+{
+    "scene_description": "Brief description of the scene",
+    "key_objects": ["object1", "object2", ...],
+    "relationships": ["relationship1", "relationship2", ...],
+    "task_sequence": [
+        {"step": 1, "action": "action_description", "target": "object_name"},
+        {"step": 2, "action": "action_description", "target": "object_name"}
+    ],
+    "confidence": 0.8
+}
+"""
+        return prompt
+    
+    def _parse_response(self, response: str) -> Dict[str, Any]:
+        """Parse LLM response into structured format"""
+        try:
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            else:
+                # Fallback to basic parsing
+                return {
+                    "scene_description": response.strip(),
+                    "key_objects": [],
+                    "relationships": [],
+                    "task_sequence": [],
+                    "confidence": 0.5
+                }
+        except Exception:
+            return {
+                "scene_description": response.strip(),
+                "key_objects": [],
+                "relationships": [],
+                "task_sequence": [],
+                "confidence": 0.3
+            }
+    
+    def get_backend_info(self) -> Dict[str, Any]:
+        """Get information about the LLM backend"""
+        return self.llm_client.get_backend_info()
+
 
 class DeepSeekSceneInterpreter:
     def __init__(self, api_key: str = None, base_url: str = "https://api.deepseek.com"):
@@ -313,7 +421,7 @@ Describe what you see, the spatial relationships between objects, and any notabl
         return f"Scene contains {len(scene_data.get('objects', []))} objects in a {scene_data.get('scene_type', 'unknown')} setting."
     
     def process_scene_graph_file(self, graph_file: str, goal: str = "Organize the scene", 
-                                output_dir: str = "data/graphs"):
+                                output_dir: str = "data/outputs/scene_graphs"):
         """Process scene graph file and generate complete interpretation"""
         
         if not os.path.exists(graph_file):
@@ -369,7 +477,7 @@ def main():
     interpreter = DeepSeekSceneInterpreter()
     
     # Check for scene graph
-    graph_file = "data/graphs/scene_graph.json"
+    graph_file = "data/outputs/scene_graphs/scene_graph.json"
     if os.path.exists(graph_file):
         print("Processing scene graph with DeepSeek R1...")
         
@@ -387,7 +495,7 @@ def main():
                 print("✓ Task sequence generated successfully")
     else:
         print("Scene graph not found. Run scene graph builder first.")
-        print("Expected location: data/graphs/scene_graph.json")
+        print("Expected location: data/outputs/scene_graphs/scene_graph.json")
 
 if __name__ == "__main__":
     main()

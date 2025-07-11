@@ -33,7 +33,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import HARDWARE_CONFIG, DATA_DIR, RESULTS_DIR
+from config import HARDWARE_CONFIG, DATA_DIR, RESULTS_DIR, RAW_VIDEOS_DIR
 
 class ThunderComputePanel:
     """Thunder Compute management panel."""
@@ -565,7 +565,7 @@ class PipelinePanel:
                 ("Video files", "*.mp4 *.avi *.mov *.mkv"),
                 ("All files", "*.*")
             ],
-            initialdir=DATA_DIR / "raw_videos"
+            initialdir=RAW_VIDEOS_DIR
         )
         if filename:
             self.input_var.set(filename)

@@ -30,12 +30,26 @@ class SceneGraphBuilder:
             with open(positions_3d_file, 'r') as f:
                 positions_3d = json.load(f)
             
-            # Add objects to graph
-            for track_id, obj_data in positions_3d.items():
+            # Extract unique objects from all frames
+            unique_objects = {}
+            for frame_key, frame_objects in positions_3d.items():
+                if isinstance(frame_objects, list):
+                    for obj in frame_objects:
+                        obj_id = obj.get("object_id")
+                        if obj_id is not None:
+                            # Store the most recent position for each object
+                            unique_objects[obj_id] = {
+                                "class_name": obj.get("class", "unknown"),
+                                "position": [obj.get("x", 0), obj.get("y", 0), obj.get("z", 0)],
+                                "num_observations": 1
+                            }
+            
+            # Add unique objects to graph
+            for obj_id, obj_data in unique_objects.items():
                 self.add_object(
-                    obj_id=f"obj_{track_id}",
+                    obj_id=f"obj_{obj_id}",
                     properties={
-                        "track_id": int(track_id),
+                        "track_id": obj_id,
                         "class_name": obj_data["class_name"],
                         "position_3d": obj_data["position"],
                         "num_observations": obj_data["num_observations"]
@@ -209,7 +223,7 @@ class SceneGraphBuilder:
                 self.add_relationship("scene", obj_id, "contains")
     
     def build_complete_graph(self, tracking_file: str, positions_3d_file: str, 
-                           output_dir: str = "data/graphs"):
+                           output_dir: str = "data/outputs/scene_graphs"):
         """Build complete scene graph from all available data"""
         os.makedirs(output_dir, exist_ok=True)
         
@@ -253,8 +267,19 @@ class SceneGraphBuilder:
         # GML format for NetworkX compatibility
         nx.write_gml(self.graph, f"{output_base}.gml")
         
-        # GraphML format for visualization tools
-        nx.write_graphml(self.graph, f"{output_base}.graphml")
+        # GraphML format for visualization tools (convert lists to strings)
+        graph_copy = self.graph.copy()
+        # Convert lists in node data
+        for node_id, data in graph_copy.nodes(data=True):
+            for key, value in data.items():
+                if isinstance(value, list):
+                    data[key] = str(value)  # Convert list to string for GraphML
+        # Convert lists in edge data
+        for src, dst, data in graph_copy.edges(data=True):
+            for key, value in data.items():
+                if isinstance(value, list):
+                    data[key] = str(value)  # Convert list to string for GraphML
+        nx.write_graphml(graph_copy, f"{output_base}.graphml")
         
         print(f"Scene graph saved to {output_base}.[json|gml|graphml]")
         print(f"Graph contains {len(self.graph.nodes)} nodes and {len(self.graph.edges)} edges")
@@ -311,8 +336,8 @@ def main():
     builder = SceneGraphBuilder()
     
     # Check for required input files
-    tracking_file = "data/tracking/tracking_results.json"
-    positions_file = "data/3d_points/object_3d_positions.json"
+    tracking_file = "data/processing/tracking/tracking_results.json"
+    positions_file = "data/outputs/point_clouds/object_3d_positions.json"
     
     if os.path.exists(tracking_file) and os.path.exists(positions_file):
         print("Building scene graph from tracking and 3D data...")

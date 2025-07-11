@@ -17,10 +17,10 @@ MODELS_DIR = PROJECT_ROOT / "models"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
 # Essential subdirectories
-RAW_VIDEOS_DIR = DATA_DIR / "raw_videos"
-FRAMES_DIR = DATA_DIR / "frames"
-TRACKING_DIR = DATA_DIR / "tracking"
-GRAPHS_DIR = DATA_DIR / "graphs"
+RAW_VIDEOS_DIR = DATA_DIR / "inputs" / "media"
+FRAMES_DIR = DATA_DIR / "processing" / "frames"
+TRACKING_DIR = DATA_DIR / "processing" / "tracking"
+GRAPHS_DIR = DATA_DIR / "outputs" / "scene_graphs"
 
 YOLO_MODELS_DIR = MODELS_DIR / "yolo"
 

@@ -8,11 +8,20 @@ import os
 from typing import List, Dict, Any, Tuple
 from segment_anything import SamAutomaticMaskGenerator, sam_model_registry, SamPredictor
 import matplotlib.pyplot as plt
+from config import SAM_CONFIG
 
 class SAMSegmenter:
-    def __init__(self, model_type: str = "vit_h", checkpoint_path: str = None):
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-        self.model_type = model_type
+    def __init__(self, model_type: str = None, checkpoint_path: str = None):
+        # Use config defaults if not provided
+        self.model_type = model_type or SAM_CONFIG["model_type"]
+        
+        # SAM has issues with MPS on Apple Silicon, use CPU for stability
+        if torch.backends.mps.is_available():
+            print("Warning: SAM may have compatibility issues with MPS, using CPU for stability")
+            self.device = torch.device("cpu")
+        else:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         self.checkpoint_path = checkpoint_path or self._get_default_checkpoint()
         self.sam_model = None
         self.mask_generator = None
@@ -41,16 +50,30 @@ class SAMSegmenter:
         print(f"Loading SAM model ({self.model_type}) on {self.device}")
         
         if os.path.exists(self.checkpoint_path):
-            self.sam_model = sam_model_registry[self.model_type](checkpoint=self.checkpoint_path)
-            self.sam_model.to(device=self.device)
-            
-            # Initialize automatic mask generator
-            self.mask_generator = SamAutomaticMaskGenerator(self.sam_model)
-            
-            # Initialize predictor for prompted segmentation
-            self.predictor = SamPredictor(self.sam_model)
-            
-            print("SAM model loaded successfully")
+            try:
+                self.sam_model = sam_model_registry[self.model_type](checkpoint=self.checkpoint_path)
+                self.sam_model.to(device=self.device)
+                
+                # Initialize automatic mask generator with conservative settings
+                self.mask_generator = SamAutomaticMaskGenerator(
+                    self.sam_model,
+                    points_per_side=SAM_CONFIG["points_per_side"],
+                    pred_iou_thresh=SAM_CONFIG["pred_iou_thresh"],
+                    stability_score_thresh=SAM_CONFIG["stability_score_thresh"],
+                    crop_n_layers=0,  # Disable cropping to save memory
+                    min_mask_region_area=100,
+                )
+                
+                # Initialize predictor for prompted segmentation
+                self.predictor = SamPredictor(self.sam_model)
+                
+                print("SAM model loaded successfully")
+            except Exception as e:
+                print(f"Error loading SAM model: {e}")
+                print("SAM segmentation will be disabled")
+                self.sam_model = None
+                self.mask_generator = None
+                self.predictor = None
         else:
             print(f"SAM checkpoint not found at {self.checkpoint_path}")
             print("Please download SAM checkpoints from: https://github.com/facebookresearch/segment-anything")
@@ -63,9 +86,14 @@ class SAMSegmenter:
             self.load_model()
             
         if self.predictor is None:
+            print("SAM model not available, skipping segmentation")
             return {"frame_id": tracking_data["frame_id"], "masks": []}
             
-        self.predictor.set_image(image)
+        try:
+            self.predictor.set_image(image)
+        except Exception as e:
+            print(f"Error setting image for SAM predictor: {e}")
+            return {"frame_id": tracking_data["frame_id"], "masks": []}
         
         frame_masks = {
             "frame_id": tracking_data["frame_id"],
@@ -76,21 +104,28 @@ class SAMSegmenter:
             bbox = detection["bbox"]
             track_id = detection["track_id"]
             
-            # Convert YOLO format (center x, center y, width, height) to SAM format
+            # Convert YOLO format (x, y, w, h) to SAM format (x1, y1, x2, y2)
             x, y, w, h = bbox
-            x1, y1 = int(x - w/2), int(y - h/2)
-            x2, y2 = int(x + w/2), int(y + h/2)
+            x1, y1 = int(x), int(y)
+            x2, y2 = int(x + w), int(y + h)
+            
+            # Ensure coordinates are within image bounds
+            x1 = max(0, min(x1, image.shape[1] - 1))
+            y1 = max(0, min(y1, image.shape[0] - 1))
+            x2 = max(x1 + 1, min(x2, image.shape[1]))
+            y2 = max(y1 + 1, min(y2, image.shape[0]))
             
             # Use bounding box as prompt for SAM
             input_box = np.array([x1, y1, x2, y2])
             
             try:
-                masks, scores, logits = self.predictor.predict(
-                    point_coords=None,
-                    point_labels=None,
-                    box=input_box[None, :],
-                    multimask_output=False,
-                )
+                with torch.no_grad():  # Save memory during inference
+                    masks, scores, logits = self.predictor.predict(
+                        point_coords=None,
+                        point_labels=None,
+                        box=input_box[None, :],
+                        multimask_output=False,
+                    )
                 
                 if len(masks) > 0:
                     mask_data = {
@@ -122,7 +157,7 @@ class SAMSegmenter:
         return masks
     
     def process_video_with_tracking(self, video_path: str, tracking_results: List[Dict], 
-                                   output_dir: str = "data/masks"):
+                                   output_dir: str = "data/processing/segmentation"):
         """
         Process video frames and generate masks for tracked objects
         """
@@ -222,13 +257,13 @@ def main():
     segmenter = SAMSegmenter(model_type="vit_b")  # Use smaller model for faster inference
     
     # Load tracking results if available
-    tracking_file = "data/tracking/tracking_results.json"
+    tracking_file = "data/processing/tracking/tracking_results.json"
     if os.path.exists(tracking_file):
         print("Loading tracking results...")
         with open(tracking_file, 'r') as f:
             tracking_results = json.load(f)
             
-        video_path = "data/sample_videos/tabletop_manipulation.mp4"
+        video_path = "data/inputs/samples/tabletop_manipulation.mp4"
         if os.path.exists(video_path):
             print("Processing video with SAM segmentation...")
             segmenter.process_video_with_tracking(video_path, tracking_results)

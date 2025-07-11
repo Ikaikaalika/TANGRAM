@@ -119,7 +119,7 @@ class YOLOByteTracker:
         """
         return self.detect_objects(frame, use_tracking=True)
     
-    def process_video(self, video_path: str, output_dir: str = "data/tracking"):
+    def process_video(self, video_path: str, output_dir: str = "data/processing/tracking"):
         """Process entire video and save tracking results"""
         os.makedirs(output_dir, exist_ok=True)
         
@@ -147,7 +147,7 @@ class YOLOByteTracker:
         print(f"Tracking results saved to {output_file}")
         return all_frames
     
-    def process_image(self, image_path: Union[str, Path], output_dir: str = "data/tracking") -> List[Dict]:
+    def process_image(self, image_path: Union[str, Path], output_dir: str = "data/processing/tracking") -> List[Dict]:
         """
         Process a single image for object detection
         Returns detection results in the same format as video processing
@@ -194,7 +194,7 @@ class YOLOByteTracker:
             logger.error(f"Image processing failed: {e}")
             return []
     
-    def process_media(self, media_path: Union[str, Path], output_dir: str = "data/tracking") -> List[Dict]:
+    def process_media(self, media_path: Union[str, Path], output_dir: str = "data/processing/tracking") -> List[Dict]:
         """
         Process either image or video automatically based on file extension
         """
@@ -248,7 +248,7 @@ def main():
     tracker = YOLOByteTracker()
     
     # Check if sample video exists
-    video_path = "data/sample_videos/tabletop_manipulation.mp4"
+    video_path = "data/inputs/samples/tabletop_manipulation.mp4"
     if os.path.exists(video_path):
         print(f"Processing video: {video_path}")
         results = tracker.process_video(video_path)

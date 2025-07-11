@@ -119,7 +119,7 @@ class LightweightDemo:
             print(f"  ✅ OpenCV {cv2.__version__} available")
             
             # Test basic image operations
-            test_image = cv2.imread(str(PROJECT_ROOT / "data" / "raw_videos" / "demo_video.mp4"))
+            test_image = cv2.imread(str(PROJECT_ROOT / "data" / "inputs" / "media" / "demo_video.mp4"))
             if test_image is not None:
                 print("  ✅ Video file readable")
             else:

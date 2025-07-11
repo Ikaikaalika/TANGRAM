@@ -42,19 +42,37 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
-data/frames/
-data/3d_points/
-data/graphs/
-data/simulation/
-data/tracking/*.json
-data/masks/*.json
+# Project specific - New data structure
+data/inputs/media/
+data/inputs/samples/
+data/inputs/demos/
+data/processing/
+data/outputs/
+data/cache/
+data_old/
 results/
 output/
 *.mp4
 *.avi
 *.mov
 *.log
+
+# Images and photos
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff
+*.gif
+
+# Old data directories (backwards compatibility)
+data/frames/
+data/3d_points/
+data/graphs/
+data/simulation/
+data/tracking/*.json
+data/masks/*.json
+data/raw_videos/
 
 # Models (large files)
 models/sam/*.pth

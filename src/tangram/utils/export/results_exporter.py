@@ -93,37 +93,37 @@ class ResultsExporter:
         
         try:
             # Load tracking results
-            tracking_file = data_dir / "tracking" / "tracking_results.json"
+            tracking_file = data_dir / "processing" / "tracking" / "tracking_results.json"
             if tracking_file.exists():
                 results["tracking_results"] = self._load_json_safe(tracking_file)
                 logger.info("Loaded tracking results")
             
             # Load segmentation results
-            segmentation_file = data_dir / "masks" / "segmentation_results.json"
+            segmentation_file = data_dir / "processing" / "segmentation" / "segmentation_results.json"
             if segmentation_file.exists():
                 results["segmentation_results"] = self._load_json_safe(segmentation_file)
                 logger.info("Loaded segmentation results")
             
             # Load 3D reconstruction results
-            reconstruction_file = data_dir / "3d_points" / "object_3d_positions.json"
+            reconstruction_file = data_dir / "outputs" / "point_clouds" / "object_3d_positions.json"
             if reconstruction_file.exists():
                 results["reconstruction_results"] = self._load_json_safe(reconstruction_file)
                 logger.info("Loaded 3D reconstruction results")
             
             # Load scene graph
-            scene_graph_file = data_dir / "graphs" / "scene_graph.json"
+            scene_graph_file = data_dir / "outputs" / "scene_graphs" / "scene_graph.json"
             if scene_graph_file.exists():
                 results["scene_graph"] = self._load_json_safe(scene_graph_file)
                 logger.info("Loaded scene graph")
             
             # Load LLM interpretation
-            llm_file = data_dir / "graphs" / "llm_interpretation.json"
+            llm_file = data_dir / "outputs" / "scene_graphs" / "llm_interpretation.json"
             if llm_file.exists():
                 results["llm_interpretation"] = self._load_json_safe(llm_file)
                 logger.info("Loaded LLM interpretation")
             
             # Load simulation results
-            simulation_file = data_dir / "simulation" / "simulation_results.json"
+            simulation_file = data_dir / "outputs" / "simulation_results" / "simulation_results.json"
             if simulation_file.exists():
                 results["simulation_results"] = self._load_json_safe(simulation_file)
                 logger.info("Loaded simulation results")

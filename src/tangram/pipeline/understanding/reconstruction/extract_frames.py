@@ -60,7 +60,7 @@ def extract_frames(video_path: str, output_dir: str,
 def main():
     parser = argparse.ArgumentParser(description="Extract frames from video for COLMAP")
     parser.add_argument("--input", "-i", required=True, help="Input video path")
-    parser.add_argument("--output", "-o", default="data/frames", help="Output directory")
+    parser.add_argument("--output", "-o", default="data/processing/frames", help="Output directory")
     parser.add_argument("--interval", type=int, default=5, 
                        help="Extract every Nth frame (default: 5)")
     parser.add_argument("--max-frames", type=int, default=200,

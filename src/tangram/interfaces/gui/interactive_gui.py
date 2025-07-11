@@ -136,18 +136,26 @@ class TangramGUI:
         self.logger.debug("ANALYZE MEDIA button created in disabled state")
         self.process_btn.pack(side=tk.RIGHT, padx=20, pady=15)
         
-        # Media display area
+        # Media display area with horizontal layout
         media_frame = tk.Frame(frame, bg='#34495e')
         media_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         tk.Label(media_frame, text="Media with Object Detection", 
                 font=('Helvetica', 14, 'bold'), fg='white', bg='#34495e').pack(pady=5)
         
-        self.media_canvas = tk.Canvas(media_frame, bg='black', width=800, height=600)
-        self.media_canvas.pack(pady=10)
+        # Create horizontal layout: image on left, detection info on right
+        content_frame = tk.Frame(media_frame, bg='#34495e')
+        content_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
-        # Media info and button status
-        info_frame = tk.Frame(media_frame, bg='#34495e')
+        # Left side: Image display
+        left_media_frame = tk.Frame(content_frame, bg='#34495e')
+        left_media_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        self.media_canvas = tk.Canvas(left_media_frame, bg='black', width=600, height=450)
+        self.media_canvas.pack()
+        
+        # Media info below image
+        info_frame = tk.Frame(left_media_frame, bg='#34495e')
         info_frame.pack(pady=5)
         
         self.media_info = tk.Label(info_frame, text="No media loaded", 
@@ -158,24 +166,32 @@ class TangramGUI:
                                      font=('Helvetica', 9), fg='#e74c3c', bg='#34495e')
         self.button_status.pack()
         
-        # Detection info
-        tk.Label(media_frame, text="Detected Objects:", 
-                font=('Helvetica', 12, 'bold'), fg='white', bg='#34495e').pack(pady=(20,5))
+        # Right side: Detection info (vertical panel)
+        right_detection_frame = tk.Frame(content_frame, bg='#2c3e50', relief=tk.RAISED, bd=2)
+        right_detection_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
         
-        self.detection_text = scrolledtext.ScrolledText(media_frame, height=8, 
-                                                       font=('Courier', 10))
-        self.detection_text.pack(fill=tk.X, padx=20, pady=5)
+        # Detection header
+        tk.Label(right_detection_frame, text="🎯 Detected Objects", 
+                font=('Helvetica', 12, 'bold'), fg='white', bg='#2c3e50').pack(pady=10)
         
-        # Add detection tips
-        tips_frame = tk.Frame(media_frame, bg='#34495e')
-        tips_frame.pack(fill=tk.X, padx=20, pady=5)
+        # Detection results with larger, more readable text
+        self.detection_text = scrolledtext.ScrolledText(right_detection_frame, 
+                                                       width=35, height=18,
+                                                       font=('Courier', 11),
+                                                       bg='#34495e', fg='white',
+                                                       wrap=tk.WORD)
+        self.detection_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        tk.Label(tips_frame, text="💡 For best detection results, use photos with:", 
-                font=('Helvetica', 10, 'bold'), fg='#f39c12', bg='#34495e').pack(anchor=tk.W)
+        # Add detection tips inside the right panel
+        tips_frame = tk.Frame(right_detection_frame, bg='#2c3e50')
+        tips_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(tips_frame, text="💡 Detection Tips:", 
+                font=('Helvetica', 10, 'bold'), fg='#f39c12', bg='#2c3e50').pack(anchor=tk.W)
         
         tips_text = "• People, vehicles, animals\n• Electronics (laptop, phone, TV)\n• Food items (apple, cup, bottle)\n• Furniture (chair, table, bed)\n• Books, bags, everyday objects"
         tk.Label(tips_frame, text=tips_text, 
-                font=('Helvetica', 9), fg='#ecf0f1', bg='#34495e', justify=tk.LEFT).pack(anchor=tk.W, padx=20)
+                font=('Helvetica', 8), fg='#ecf0f1', bg='#2c3e50', justify=tk.LEFT).pack(anchor=tk.W, padx=5)
     
     def create_3d_tab(self, parent):
         frame = tk.Frame(parent, bg='#2c3e50')
@@ -346,6 +362,11 @@ class TangramGUI:
         # Scene graph visualization (top)
         tk.Label(top_panel, text="Temporal Spatial Scene Graph", 
                 font=('Helvetica', 14, 'bold'), fg='white', bg='#34495e').pack(pady=5)
+        
+        # Graph status
+        self.graph_status = tk.Label(top_panel, text="📊 Ready to load scene graph", 
+                                   fg='#f39c12', bg='#34495e')
+        self.graph_status.pack(pady=2)
         
         # Create matplotlib figure for scene graph
         self.graph_fig = plt.figure(figsize=(12, 8), facecolor='#2c3e50')
@@ -650,25 +671,39 @@ class TangramGUI:
         try:
             self.logger.info("Starting background media processing")
             
-            # Use direct YOLO detection instead of full pipeline to avoid LLM issues
-            from src.tangram.pipeline.perception.tracker.track_objects import YOLOByteTracker
+            # Import and use the full TANGRAM pipeline
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+            from main import TANGRAMPipeline
             
-            tracker = YOLOByteTracker()
+            # Initialize pipeline with current media
+            pipeline = TANGRAMPipeline(input_path=self.current_media, output_dir="data/outputs", experiment_name="gui_session")
             
-            # Process media directly
-            results = tracker.process_media(self.current_media, "data/tracking")
-            self.logger.info(f"Detection completed, found {len(results)} frames")
+            # Run full pipeline
+            self.logger.info("Running full TANGRAM pipeline...")
+            success = pipeline.run_full_pipeline("Analyze and understand the scene", gui=False)
             
-            if results and len(results) > 0:
-                # Extract detections from first frame
-                detections = results[0].get('detections', [])
-                self.logger.info(f"Found {len(detections)} objects in media")
+            if success:
+                # Load the tracking results to display in GUI
+                tracking_file = "data/processing/tracking/tracking_results.json"
+                if os.path.exists(tracking_file):
+                    import json
+                    with open(tracking_file, 'r') as f:
+                        tracking_data = json.load(f)
+                    
+                    if tracking_data and len(tracking_data) > 0:
+                        detections = tracking_data[0].get('detections', [])
+                        self.logger.info(f"Found {len(detections)} objects in media")
+                        self.scene_objects = detections
+                    else:
+                        self.scene_objects = []
+                else:
+                    self.scene_objects = []
                 
-                # Store results and update GUI
-                self.scene_objects = detections
                 self.root.after(0, self._processing_done)
             else:
-                self.logger.warning("No detection results returned")
+                self.logger.warning("Full pipeline processing failed")
                 self.scene_objects = []
                 self.root.after(0, self._processing_done)
             
@@ -872,7 +907,7 @@ class TangramGUI:
         import time
         
         timestamp = int(time.time())
-        photo_path = Path("data/raw_videos") / f"photo_{timestamp}.jpg"
+        photo_path = Path("data/inputs/media") / f"photo_{timestamp}.jpg"
         photo_path.parent.mkdir(parents=True, exist_ok=True)
         
         cv2.imwrite(str(photo_path), frame)
@@ -939,7 +974,7 @@ class TangramGUI:
             import time
             
             timestamp = int(time.time())
-            video_path = Path("data/raw_videos") / f"video_{timestamp}.mp4"
+            video_path = Path("data/inputs/media") / f"video_{timestamp}.mp4"
             video_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Video writer settings
@@ -960,7 +995,8 @@ class TangramGUI:
             self.root.after(0, lambda: self._video_saved(video_path))
             
         except Exception as e:
-            self.root.after(0, lambda: self.recording_status.config(text=f"❌ Save error: {e}"))
+            error_msg = f"❌ Save error: {e}"
+            self.root.after(0, lambda: self.recording_status.config(text=error_msg))
     
     def _video_saved(self, video_path):
         """Called when video is successfully saved"""
@@ -1104,7 +1140,8 @@ class TangramGUI:
             self.root.after(0, lambda: self._execute_actions(response, command))
             
         except Exception as e:
-            self.root.after(0, lambda: self._llm_response(f"❌ Error: {e}"))
+            error_msg = f"❌ Error: {e}"
+            self.root.after(0, lambda: self._llm_response(error_msg))
     
     def _build_scene_context(self):
         """Build comprehensive scene context for LLM"""
@@ -1433,23 +1470,40 @@ class TangramGUI:
         # Clear the graph
         self.graph_ax.clear()
         
-        # Draw a simple scene graph based on current time
+        # Try to load actual scene graph data from pipeline
         import networkx as nx
+        import json
+        import os
         
         G = nx.Graph()
+        scene_graph_file = "data/outputs/scene_graphs/scene_graph.json"
         
-        # Add nodes based on detected objects
-        if self.scene_objects:
-            for i, obj in enumerate(self.scene_objects):
-                obj_name = obj.get('class_name', f'object_{i}')
-                G.add_node(obj_name)
-        
-        # Add some temporal relationships
-        if len(G.nodes()) > 1:
-            nodes = list(G.nodes())
-            for i in range(len(nodes) - 1):
-                if current_time > i:  # Show relationships progressively
-                    G.add_edge(nodes[i], nodes[i + 1])
+        if os.path.exists(scene_graph_file):
+            try:
+                # Load the actual scene graph data
+                with open(scene_graph_file, 'r') as f:
+                    scene_data = json.load(f)
+                
+                # Build graph from actual data
+                if 'nodes' in scene_data:
+                    for node_id, node_data in scene_data['nodes'].items():
+                        G.add_node(node_id, **node_data)
+                
+                if 'edges' in scene_data:
+                    for edge in scene_data['edges']:
+                        if len(edge) >= 2:
+                            G.add_edge(edge[0], edge[1], 
+                                     relationship=edge[2] if len(edge) > 2 else "connected")
+                
+                self.graph_status.config(text="✅ Scene graph loaded", fg='#27ae60')
+            except Exception as e:
+                self.graph_status.config(text=f"❌ Error loading scene graph: {e}", fg='#e74c3c')
+                # Fallback to simple graph from detected objects
+                self._create_fallback_graph(G)
+        else:
+            self.graph_status.config(text="📊 No scene graph data - run full pipeline", fg='#f39c12')
+            # Fallback to simple graph from detected objects
+            self._create_fallback_graph(G)
         
         # Draw the graph
         if G.nodes():
@@ -1462,6 +1516,21 @@ class TangramGUI:
                                color='white', fontsize=12)
         self.graph_ax.set_facecolor('#2c3e50')
         self.canvas_graph.draw()
+    
+    def _create_fallback_graph(self, G):
+        """Create a simple fallback graph from detected objects"""
+        # Add nodes based on detected objects
+        if self.scene_objects:
+            for i, obj in enumerate(self.scene_objects):
+                obj_name = obj.get('class_name', f'object_{i}')
+                G.add_node(obj_name)
+        
+        # Add some simple spatial relationships if we have multiple objects
+        if len(G.nodes()) > 1:
+            nodes = list(G.nodes())
+            # Just connect objects in sequence for now
+            for i in range(len(nodes) - 1):
+                G.add_edge(nodes[i], nodes[i + 1], relationship="near")
     
     def run(self):
         # Set up cleanup on window close

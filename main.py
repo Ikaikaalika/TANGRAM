@@ -30,7 +30,8 @@ from config import (
     FRAME_EXTRACTION_CONFIG, SAM_CONFIG, YOLO_CONFIG, 
     COLMAP_CONFIG, PYBULLET_CONFIG, HARDWARE_CONFIG,
     SCENE_GRAPH_CONFIG, LLM_CONFIG, DATA_DIR, RESULTS_DIR,
-    TRACKING_DIR, FRAMES_DIR, GRAPHS_DIR, SIMULATION_DIR, MASKS_DIR
+    TRACKING_DIR, FRAMES_DIR, GRAPHS_DIR, SIMULATION_DIR, MASKS_DIR,
+    RECONSTRUCTION_DIR
 )
 from src.tangram.utils.logging_utils import setup_logger, log_pipeline_step
 from src.tangram.utils.mock_data import create_mock_3d_positions

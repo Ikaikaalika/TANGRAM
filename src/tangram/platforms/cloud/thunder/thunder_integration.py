@@ -48,7 +48,7 @@ class ThunderIntegratedSegmenter:
     
     @log_function_call()
     def process_video_with_tracking(self, video_path: str, tracking_results: List[Dict],
-                                   output_dir: str = "data/masks") -> List[Dict[str, Any]]:
+                                   output_dir: str = "data/processing/segmentation") -> List[Dict[str, Any]]:
         """
         Process video with automatic Thunder Compute integration.
         
@@ -143,7 +143,7 @@ class ThunderIntegratedReconstructor:
     
     @log_function_call()
     def run_reconstruction_pipeline(self, video_path: str, frames_dir: str,
-                                   output_dir: str = "data/3d_points") -> Dict[str, Any]:
+                                   output_dir: str = "data/outputs/point_clouds") -> Dict[str, Any]:
         """
         Run complete 3D reconstruction pipeline.
         
@@ -247,7 +247,7 @@ class ThunderIntegratedSimulator:
     
     @log_function_call()
     def execute_task_sequence_with_thunder(self, scene_graph_file: str, llm_interpretation_file: str,
-                                         output_dir: str = "data/simulation") -> Dict[str, Any]:
+                                         output_dir: str = "data/outputs/simulation_results") -> Dict[str, Any]:
         """
         Execute robot task sequence with Thunder Compute integration.
         
@@ -419,14 +419,14 @@ class ThunderIntegratedDemo:
             # Step 1: Object Tracking (local - fast)
             logger.info("Step 1: Object Tracking (Local)")
             tracking_results = self.tracker.process_video(
-                video_path, output_dir="data/tracking"
+                video_path, output_dir="data/processing/tracking"
             )
             results["tracking"] = tracking_results
             
             # Step 2: Segmentation (Thunder Compute if needed)
             logger.info("Step 2: SAM Segmentation (Auto: Thunder/Local)")
             segmentation_results = self.segmenter.process_video_with_tracking(
-                video_path, tracking_results, "data/masks"
+                video_path, tracking_results, "data/processing/segmentation"
             )
             results["segmentation"] = segmentation_results
             
@@ -435,10 +435,10 @@ class ThunderIntegratedDemo:
             
             # Extract frames first
             from reconstruction.extract_frames import extract_frames
-            extract_frames(video_path, "data/frames", frame_interval=10, max_frames=100)
+            extract_frames(video_path, "data/processing/frames", frame_interval=10, max_frames=100)
             
             reconstruction_results = self.reconstructor.run_reconstruction_pipeline(
-                video_path, "data/frames", "data/3d_points"
+                video_path, "data/processing/frames", "data/outputs/point_clouds"
             )
             results["reconstruction"] = reconstruction_results
             

@@ -3,8 +3,8 @@
 # COLMAP 3D Reconstruction Pipeline
 # Usage: ./run_colmap.sh <input_directory> <output_directory>
 
-INPUT_DIR=${1:-"../data/frames"}
-OUTPUT_DIR=${2:-"../data/3d_points"}
+INPUT_DIR=${1:-"../data/processing/frames"}
+OUTPUT_DIR=${2:-"../data/processing/colmap_reconstruction"}
 
 echo "Running COLMAP reconstruction..."
 echo "Input: $INPUT_DIR"

@@ -111,7 +111,7 @@ class PointTriangulator:
         return R
     
     def triangulate_object_positions(self, mask_data: List[Dict], 
-                                   output_dir: str = "data/3d_points") -> Dict[str, Any]:
+                                   output_dir: str = "data/outputs/point_clouds") -> Dict[str, Any]:
         """
         Triangulate 3D positions of tracked objects using their masks and camera poses
         """
@@ -132,7 +132,7 @@ class PointTriangulator:
                     }
                 
                 # Calculate mask centroid as 2D observation
-                mask_file = os.path.join("data/masks", mask_info["mask_file"])
+                mask_file = os.path.join("data/processing/segmentation", mask_info["mask_file"])
                 if os.path.exists(mask_file):
                     mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
                     if mask is not None:
@@ -208,7 +208,7 @@ class PointTriangulator:
         return None
     
     def export_point_cloud(self, object_positions: Dict[str, Any], 
-                          output_file: str = "data/3d_points/scene_point_cloud.ply"):
+                          output_file: str = "data/outputs/point_clouds/scene_point_cloud.ply"):
         """Export 3D object positions as point cloud"""
         points = []
         colors = []
@@ -251,12 +251,12 @@ def main():
     triangulator = PointTriangulator()
     
     # Load COLMAP results if available
-    colmap_dir = "data/3d_points"
+    colmap_dir = "data/outputs/point_clouds"
     if os.path.exists(os.path.join(colmap_dir, "sparse")):
         triangulator.load_colmap_results(colmap_dir)
         
         # Load mask data
-        mask_file = "data/masks/segmentation_results.json"
+        mask_file = "data/processing/segmentation/segmentation_results.json"
         if os.path.exists(mask_file):
             with open(mask_file, 'r') as f:
                 mask_data = json.load(f)
